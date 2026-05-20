@@ -12,7 +12,7 @@ license = { text = "MIT" }
 authors = [
   { name = "gpu-holder contributors" },
 ]
-keywords = ["gpu", "cuda", "nvidia", "monitoring", "utilization", "cli"]
+keywords = ["gpu", "cuda", "nvidia", "utilization", "cli"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: Console",
@@ -26,14 +26,7 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-monitor = [
-  "nvidia-ml-py>=12.0.0",
-]
 torch = [
-  "torch>=2.0.0",
-]
-cuda = [
-  "nvidia-ml-py>=12.0.0",
   "torch>=2.0.0",
 ]
 dev = [

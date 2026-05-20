@@ -89,15 +89,18 @@ class WorkerProcess:
         self.stop(timeout=1.0)
         raise WorkerStartError("worker exited before reporting readiness")
 
-    def stop(self, timeout: float = 5.0) -> None:
+    def stop(self, timeout: float = 0.2) -> None:
         if self.process is None:
             return
         if self.process.is_alive():
             self.process.terminate()
             self.process.join(timeout=timeout)
-        if self.process.is_alive() and self.process.pid is not None:
-            os.kill(self.process.pid, signal.SIGKILL)
-            self.process.join(timeout=1.0)
+        if self.process.is_alive():
+            if hasattr(self.process, "kill"):
+                self.process.kill()
+            elif self.process.pid is not None:
+                os.kill(self.process.pid, signal.SIGKILL)
+            self.process.join(timeout=0.5)
         self.process = None
 
 

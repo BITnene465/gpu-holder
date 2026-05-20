@@ -1,37 +1,17 @@
 # gpu-holder
 
-`gpu-holder` 是一个面向共享 NVIDIA 机器的“礼貌占卡”工具。它会在机器空闲时用 CUDA 计算把 GPU 平均利用率维持在目标线以上，同时在真实训练、推理或服务进程出现时主动让道。
+`gpu-holder` 是一个很小的 NVIDIA GPU 占卡工具：机器空闲时启动自己的 CUDA worker，把平均利用率维持到目标线附近；真实训练、推理或服务进程出现时释放自己的 worker。
 
-这个项目的目标很明确：
+它的安全边界很窄：
 
-- 默认保持整机平均 GPU 利用率不低于回收阈值，例如 `70%`。
-- 默认只占 `20%` 显存，避免把整张卡锁死。
-- 当某张卡出现大显存真实进程时，默认释放该卡。
-- 当某张卡持续低利用率超过窗口时，优先介入补负载。
-- 不 kill、不 suspend、不 renice 任何外部 GPU 进程。
-- 基础包零三方依赖，后续可以直接发布为 CLI 工具。
-
-## 当前默认策略
-
-- 目标整机平均利用率：`75%`
-- 低利用率阈值：`50%`
-- 低利用率判定窗口：`60s`
-- 统计窗口：`3600s`
-- 默认显存占用：`20%`
-- 大进程让道阈值：`10GiB`
-- 显存预留：`2GiB`
-- 温度释放阈值：`85C`
-- 温度恢复阈值：`80C`
-
-低利用率介入优先级高于大进程让道：如果某张卡连续 `60s` 低于 `50%`，即使卡上已有大进程，`gpu-holder` 也会以更小显存的 assist 模式补负载，尽量帮助整机平均利用率达标。
+- 只管理自己启动的 guard / worker。
+- 外部 GPU 进程只作为只读调度信号。
+- 不 kill、不 suspend、不 renice 外部任务。
+- 不维护配置系统、监控导出、外部面板、策略解释器或 TUI。
 
 ## 安装
 
-基础安装不引入任何三方依赖。监控可以使用系统自带的 `nvidia-smi`，真实 CUDA worker 会使用当前环境中已有的 PyTorch。
-
-项目 Python 版本固定为 `3.10.11`，包运行约束为 `>=3.10,<3.11`，依赖解析结果记录在 `uv.lock`。
-
-如果使用 `uv`：
+基础包没有运行时三方依赖。状态读取依赖系统里的 `nvidia-smi`；真实 CUDA worker 依赖当前环境可用的 PyTorch。
 
 ```bash
 cd /root/workspace/nene/gpu-holder
@@ -39,7 +19,7 @@ uv sync --python 3.10.11 --extra dev
 uv run gpu-holder doctor
 ```
 
-如果要复用宿主机已经装好的 CUDA PyTorch，推荐在项目内创建独立 virtualenv，避免混入其他项目环境：
+复用宿主机已有 CUDA PyTorch 时，可以创建带 system site packages 的环境：
 
 ```bash
 cd /root/workspace/nene/gpu-holder
@@ -48,152 +28,79 @@ virtualenv --python /usr/bin/python3.10 --system-site-packages --clear .venv
 .venv/bin/gpu-holder doctor
 ```
 
-说明：
-
-- `--system-site-packages` 用来复用宿主机已经可用的 CUDA PyTorch。
-- 如果希望完全隔离，可以去掉 `--system-site-packages`，然后单独安装适配本机驱动的 PyTorch CUDA wheel。
-- 当前机器上已验证：独立 `.venv` 使用 Python `3.10.11`，可复用 `torch=2.5.1+cu121`。
-
-可选 extras：
+可选依赖：
 
 ```bash
-python -m pip install -e ".[monitor]"  # 安装 nvidia-ml-py
-python -m pip install -e ".[torch]"    # 从当前 pip 源安装 PyTorch
-python -m pip install -e ".[cuda]"     # monitor + torch
-python -m pip install -e ".[dev]"      # 测试、lint、构建工具
+python -m pip install -e ".[torch]"  # 从当前 pip 源安装 PyTorch
+python -m pip install -e ".[dev]"    # 测试、lint、构建工具
 ```
 
-## 快速使用
+## 使用
 
-前台运行，适合挂在 tmux 中：
+前台指定 8 张卡运行：
 
 ```bash
-gpu-holder guard
+gpu-holder guard --gpus 0-7 --mem 0.2 --target-util 0.75
 ```
 
-后台守护进程：
+后台运行：
 
 ```bash
-gpu-holder start
+gpu-holder start --gpus 0-7 --mem 0.2 --target-util 0.75
 gpu-holder status
 gpu-holder dashboard
 gpu-holder stop
 ```
 
-强制使用矩阵乘法把 8 张卡都拉高负载：
+`--mem` 和 `--target-util` 都使用 `0~1` 浮点数：
+
+- `--gpus 0-7` 表示使用 0 到 7 号卡；也支持 `all` 和 `0-3,6,7`。
+- `--mem 0.2` 表示最多使用单卡显存的 20%。
+- `--target-util 0.75` 表示目标整机平均利用率 75%。
+- 兼容旧写法：`20%`、`75%`、`75` 仍会被解析成 `0.2`、`0.75`、`0.75`。
+
+默认策略：
+
+- 目标整机平均利用率：`0.75`
+- 释放缓冲：目标线以上 `0.03`
+- 默认显存占用：`0.2`
+- 显存预留：`2GiB`
+- 大进程让道阈值：`10GiB`
+- 低利用率阈值：`50%`
+- 温度释放阈值：`85C`
+
+释放缓冲的作用是避免刚到目标线就释放 worker，导致最终平均利用率总是略低于 `--target-util`。已有 holder worker 时，工具会等平均利用率超过 `target + 0.03` 后再释放。
+
+## 命令
+
+当前只保留 6 个命令：
 
 ```bash
-gpu-holder start \
-  --gpus 0,1,2,3,4,5,6,7 \
-  --target-util 95 \
-  --mem 20% \
-  --program matmul \
-  --min-duty-cycle 1 \
-  --max-duty-cycle 1 \
-  --compute-burst-seconds 2 \
-  --compute-burst-jitter 0 \
-  --process-grace-window 0 \
-  --sample-interval 2
+gpu-holder guard      # 前台运行
+gpu-holder start      # 后台运行
+gpu-holder stop       # 快速停止后台 guard
+gpu-holder status     # 打印最近状态
+gpu-holder dashboard  # 打印一次紧凑状态快照
+gpu-holder doctor     # 检查 nvidia-smi 和 PyTorch CUDA
 ```
 
-只看策略，不启动 worker：
-
-```bash
-gpu-holder plan --fake
-gpu-holder preflight --fake --no-diagnostics
-gpu-holder tune --strict
-```
-
-生成配置：
-
-```bash
-gpu-holder init-config --stdout
-gpu-holder init-config --path gpu-holder.toml
-gpu-holder recipes
-gpu-holder recipes --name strict-quota
-```
-
-暂停和恢复：
-
-```bash
-gpu-holder pause --for 10m
-gpu-holder resume
-gpu-holder disable-gpu 7 --for 30m
-gpu-holder enable-gpu 7
-```
-
-导出监控：
-
-```bash
-gpu-holder metrics
-gpu-holder alerts > gpu-holder-alerts.yml
-gpu-holder grafana-dashboard > gpu-holder-dashboard.json
-gpu-holder monitoring-bundle --output-dir /tmp/gpu-holder-monitoring
-```
-
-## CLI 状态快照
-
-当前版本移除了交互式 TUI，只保留 CLI。`dashboard` 会打印一次文本快照，适合 tmux、日志和远程 SSH：
-
-```bash
-gpu-holder dashboard
-```
-
-```bash
-gpu-holder dashboard --once
-gpu-holder dashboard --once --history --explain --advice
-```
-
-## 安全边界
-
-`gpu-holder` 只会管理自己启动的 worker 进程。外部 GPU 进程只作为调度信号读取：
-
-- 可以读取外部 PID 的显存、进程名、GPU 归属。
-- 可以因为外部进程出现而释放自己的 worker。
-- 不可以 kill 外部训练或服务进程。
-- 不可以释放别的进程显存。
-- 不可以通过 shell 调用破坏性进程管理命令。
-
-`gpu-holder stop` 也会检查 pidfile 指向的是否是自己的 guard 进程；如果 pidfile 属于非 holder 进程，会拒绝操作。
+`stop` 会先发 `SIGTERM`，短时间未退出则发 `SIGKILL`。pidfile 指向非 holder 进程时会拒绝操作。
 
 ## 项目结构
 
 ```text
 src/gpu_holder/
-  cli.py              # CLI 入口
-  config.py           # 配置、profile、recipe
-  policy.py           # 纯策略决策
-  controller.py       # 进程与运行态编排
-  worker.py           # CUDA worker
-  monitor.py          # NVML / nvidia-smi 监控
-  dashboard.py        # CLI 状态快照格式化
-  diagnostics.py      # doctor / preflight 诊断
-docs/
-  tutorial.md         # 详细教程
-  requirements.md     # 需求说明
-  architecture.md     # 架构说明
-  testing.md          # 测试说明
-  release.md          # 发布检查清单
+  cli.py       # CLI、nvidia-smi 读取、调度循环
+  worker.py    # CUDA worker
+  __init__.py
+  __main__.py
 ```
 
 ## 开发与测试
 
 ```bash
-uv lock --check
-python -m pip install --no-build-isolation -e .
 python -m pytest -q
 python -m ruff check --no-cache src tests
 PYTHONPYCACHEPREFIX=/tmp/gpu-holder-pycache python -m compileall -q src tests
-```
-
-打包检查：
-
-```bash
 python -m build
 ```
-
-## 详细教程
-
-从安装、配置、前台日志、后台运行、监控接入到故障排查，见：
-
-- [docs/tutorial.md](docs/tutorial.md)

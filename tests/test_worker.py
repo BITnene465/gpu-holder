@@ -119,3 +119,42 @@ def test_worker_start_timeout_stops_unready_live_process(monkeypatch) -> None:
         worker.start(timeout=0.01)
 
     assert worker.process is None
+
+
+def test_worker_stop_kills_process_after_short_terminate_timeout() -> None:
+    class SlowProcess:
+        pid = 12345
+
+        def __init__(self) -> None:
+            self.terminated = False
+            self.killed = False
+            self.join_timeouts: list[float | None] = []
+
+        def is_alive(self) -> bool:
+            return not self.killed
+
+        def terminate(self) -> None:
+            self.terminated = True
+
+        def kill(self) -> None:
+            self.killed = True
+
+        def join(self, timeout: float | None = None) -> None:
+            self.join_timeouts.append(timeout)
+
+    process = SlowProcess()
+    worker = WorkerProcess(
+        gpu_index=0,
+        memory_bytes=0,
+        duty_cycle=1.0,
+        program="matmul",
+        hold_mode="compute-only",
+    )
+    worker.process = process
+
+    worker.stop(timeout=0.2)
+
+    assert process.terminated is True
+    assert process.killed is True
+    assert process.join_timeouts == [0.2, 0.5]
+    assert worker.process is None

@@ -11,36 +11,31 @@ from gpu_holder import __version__
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_package_module_entrypoint_prints_version() -> None:
+def run_module(*args: str) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(ROOT / "src")
-
-    result = subprocess.run(
-        [sys.executable, "-m", "gpu_holder", "--version"],
+    return subprocess.run(
+        [sys.executable, "-m", "gpu_holder", *args],
         cwd=ROOT,
         env=env,
         text=True,
         capture_output=True,
         check=False,
     )
+
+
+def test_package_module_entrypoint_prints_version() -> None:
+    result = run_module("--version")
 
     assert result.returncode == 0
     assert result.stdout.strip() == f"gpu-holder {__version__}"
     assert result.stderr == ""
 
 
-def test_package_module_entrypoint_runs_cli_commands() -> None:
-    env = os.environ.copy()
-    env["PYTHONPATH"] = str(ROOT / "src")
-
-    result = subprocess.run(
-        [sys.executable, "-m", "gpu_holder", "plan", "--fake"],
-        cwd=ROOT,
-        env=env,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+def test_package_module_entrypoint_exposes_guard_help() -> None:
+    result = run_module("guard", "--help")
 
     assert result.returncode == 0
-    assert "gpu=0 action=hold" in result.stdout
+    assert "--target-util" in result.stdout
+    assert "--mem" in result.stdout
+    assert "from 0 to 1" in result.stdout

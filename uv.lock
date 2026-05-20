@@ -123,17 +123,10 @@ version = "0.1.0"
 source = { editable = "." }
 
 [package.optional-dependencies]
-cuda = [
-    { name = "nvidia-ml-py" },
-    { name = "torch" },
-]
 dev = [
     { name = "build" },
     { name = "pytest" },
     { name = "ruff" },
-]
-monitor = [
-    { name = "nvidia-ml-py" },
 ]
 torch = [
     { name = "torch" },
@@ -142,14 +135,11 @@ torch = [
 [package.metadata]
 requires-dist = [
     { name = "build", marker = "extra == 'dev'", specifier = ">=1.0.0" },
-    { name = "nvidia-ml-py", marker = "extra == 'cuda'", specifier = ">=12.0.0" },
-    { name = "nvidia-ml-py", marker = "extra == 'monitor'", specifier = ">=12.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.9.0" },
-    { name = "torch", marker = "extra == 'cuda'", specifier = ">=2.0.0" },
     { name = "torch", marker = "extra == 'torch'", specifier = ">=2.0.0" },
 ]
-provides-extras = ["monitor", "torch", "cuda", "dev"]
+provides-extras = ["torch", "dev"]
 
 [[package]]
 name = "importlib-metadata"
@@ -335,15 +325,6 @@ source = { registry = "http://pip.baidu-int.com/simple/" }
 wheels = [
     { url = "http://pip.baidu-int.com/packages/packages/46/e1/cdc1797eadf82d3a9a575a19b33fdc871a97edbec42c00b5b5e914f4aff4/nvidia_cusparselt_cu13-0.8.1-py3-none-manylinux2014_aarch64.whl", hash = "sha256:4dca476c50bf4780d46cd0bfbd82e2bc10a08e4fef7950917ce8d7578d22a23f" },
     { url = "http://pip.baidu-int.com/packages/packages/34/7d/2661f2fb3ac4302f3a246f5fc030213ac60c1fe0bce84f9783dbd831dbb7/nvidia_cusparselt_cu13-0.8.1-py3-none-manylinux2014_x86_64.whl", hash = "sha256:786ce87568c303fadb5afcc7102d454cd3040d75f6f8626f5db460d1871f4dd0" },
-]
-
-[[package]]
-name = "nvidia-ml-py"
-version = "13.595.45"
-source = { registry = "http://pip.baidu-int.com/simple/" }
-sdist = { url = "http://pip.baidu-int.com/packages/packages/ce/49/c29f6e30d8662d2e94fef17739ea7309cc76aba269922ae999e4cc07f268/nvidia_ml_py-13.595.45.tar.gz", hash = "sha256:c9f34897fe0441ff35bc8f35baf80f830a20b0f4e6ce71e0a325bc0e66acf079" }
-wheels = [
-    { url = "http://pip.baidu-int.com/packages/packages/8a/24/fc256107d23597fa33d319505ce77160fa1a2349c096d01901ffc7cb7fc4/nvidia_ml_py-13.595.45-py3-none-any.whl", hash = "sha256:b65a7977f503d56154b14d683710125ef93594adb63fbf7e559336e3318f1376" },
 ]
 
 [[package]]
