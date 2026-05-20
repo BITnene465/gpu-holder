@@ -1,8 +1,8 @@
-# Security Policy
+# 安全策略
 
-`gpu-holder` intentionally does not control external processes. If you discover
-behavior that can terminate, suspend, or otherwise manipulate a non-holder
-process, please treat it as a safety bug.
+`gpu-holder` 的核心安全边界是：外部 GPU 进程只能作为只读调度信号。
 
-For private reports, open a GitHub security advisory after the repository is
-published.
+如果你发现任何会终止、暂停、调整优先级、释放显存，或以其他方式操控非
+`gpu-holder` worker 进程的行为，请把它视为安全缺陷。
+
+当前仓库发布到 GitHub 后，私密报告优先通过 GitHub Security Advisory 提交。

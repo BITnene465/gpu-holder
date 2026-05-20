@@ -1,12 +1,12 @@
 name: Runtime support
-description: Ask for help interpreting status, events, doctor output, or policy decisions.
+description: 请求帮助解释 status、events、doctor 输出或策略决策。
 title: "[support]: "
 labels: ["support"]
 body:
   - type: markdown
     attributes:
       value: |
-        For support requests, prefer read-only commands first:
+        支持请求优先使用只读命令：
 
         ```bash
         gpu-holder doctor --json
@@ -17,25 +17,25 @@ body:
   - type: textarea
     id: question
     attributes:
-      label: Question
-      description: What are you trying to understand or fix?
+      label: 问题
+      description: 你想理解或修复什么？
     validations:
       required: true
   - type: textarea
     id: environment
     attributes:
-      label: Environment
-      description: Python version, GPU model, driver/CUDA version, install method.
+      label: 环境
+      description: Python 版本、GPU 型号、driver/CUDA 版本、安装方式。
   - type: textarea
     id: outputs
     attributes:
-      label: Read-only outputs
-      description: Paste relevant doctor/status/events/report output.
+      label: 只读输出
+      description: 粘贴相关 doctor/status/events/report 输出。
       render: json
   - type: checkboxes
     id: safety
     attributes:
-      label: Safety
+      label: 安全
       options:
-        - label: I understand `gpu-holder` should only stop workers it started itself, not external GPU jobs.
+        - label: 我理解 `gpu-holder` 只应该停止自己启动的 worker，而不是外部 GPU 任务。
           required: true

@@ -25,7 +25,7 @@ COMMANDS: dict[str, str] = {
     "events": "show recent controller events",
     "history": "summarize recent controller event history",
     "explain": "explain current guard state and suggested actions",
-    "dashboard": "open the terminal status dashboard",
+    "dashboard": "print a terminal status snapshot",
     "pause": "pause all holder workers",
     "resume": "resume holder workers",
     "disable-gpu": "release and skip one GPU at runtime",
@@ -43,7 +43,7 @@ GUARD_LIKE_EXTRA_FLAGS = [
     "--dry-run",
     "--fake",
     "--json",
-    "--tui",
+    "--log-interval",
 ]
 
 
@@ -89,9 +89,6 @@ COMMAND_FLAGS: dict[str, list[str]] = {
     "explain": ["--state-dir", "--limit", "--stale-after", "--json"],
     "dashboard": [
         "--state-dir",
-        "--refresh-interval",
-        "--temporary-disable-duration",
-        "--temporary-pause-duration",
         "--once",
         "--events",
         "--history",

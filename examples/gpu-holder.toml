@@ -48,6 +48,7 @@ protected_process_patterns = []
 
 # Runtime files.
 state_dir = "~/.gpu-holder"
+log_interval = 10
 event_log_max_size = "10MiB"
 event_log_backup_count = 3
 worker_restart_backoff = 30

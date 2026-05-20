@@ -1318,6 +1318,9 @@ def test_start_removes_stale_pid_file_and_starts(tmp_path: Path, monkeypatch, ca
     assert "removed stale pid file" in captured.err
     assert pid_file.read_text(encoding="utf-8") == "4242"
     assert started_commands
+    command, kwargs = started_commands[0]
+    assert command[:3] == [cli.sys.executable, "-m", "gpu_holder.cli"]
+    assert kwargs["env"].get("PYTHONPATH") == os.environ.get("PYTHONPATH")
 
 
 def test_start_refuses_pid_file_for_live_non_holder_process(
@@ -2148,11 +2151,11 @@ def test_dashboard_once_renders_status_without_curses(tmp_path: Path, capsys) ->
     }
     (tmp_path / "status.json").write_text(json.dumps(payload), encoding="utf-8")
 
-    result = main(["dashboard", "--state-dir", str(tmp_path), "--once"])
+    result = main(["dashboard", "--state-dir", str(tmp_path)])
 
     captured = capsys.readouterr()
     assert result == 0
-    assert "gpu-holder dashboard" in captured.out
+    assert "gpu-holder status snapshot" in captured.out
     assert "gpu=0 util=42%" in captured.out
     assert "reason=below_target" in captured.out
 
@@ -2295,47 +2298,6 @@ def test_dashboard_once_reports_invalid_status_file(tmp_path: Path, capsys) -> N
     assert result == 1
     assert "invalid status file" in captured.out
     assert "Traceback" not in captured.err
-
-
-def test_dashboard_rejects_invalid_temporary_disable_duration(tmp_path: Path, capsys) -> None:
-    result = main(["dashboard", "--state-dir", str(tmp_path), "--temporary-disable-duration", "0m"])
-
-    captured = capsys.readouterr()
-    assert result == 2
-    assert "invalid --temporary-disable-duration" in captured.err
-
-
-def test_dashboard_rejects_invalid_temporary_pause_duration(tmp_path: Path, capsys) -> None:
-    result = main(["dashboard", "--state-dir", str(tmp_path), "--temporary-pause-duration", "0m"])
-
-    captured = capsys.readouterr()
-    assert result == 2
-    assert "invalid --temporary-pause-duration" in captured.err
-
-
-def test_dashboard_passes_temporary_disable_duration_to_tui(monkeypatch, tmp_path: Path) -> None:
-    seen = []
-
-    def fake_run_status_dashboard(**kwargs) -> None:
-        seen.append(kwargs)
-
-    monkeypatch.setattr("gpu_holder.tui.run_status_dashboard", fake_run_status_dashboard)
-
-    result = main(
-        [
-            "dashboard",
-            "--state-dir",
-            str(tmp_path),
-            "--temporary-disable-duration",
-            "2h",
-            "--temporary-pause-duration",
-            "15m",
-        ]
-    )
-
-    assert result == 0
-    assert seen[0]["temporary_disable_seconds"] == 7200
-    assert seen[0]["temporary_pause_seconds"] == 900
 
 
 def test_status_watch_prints_multiple_snapshots(tmp_path: Path, capsys) -> None:
@@ -2954,7 +2916,7 @@ def test_doctor_text_prints_actionable_suggestions(monkeypatch, capsys) -> None:
                     "name": "pynvml",
                     "ok": False,
                     "detail": "ModuleNotFoundError: No module named pynvml",
-                    "suggestion": "Install NVML bindings with: python -m pip install 'gpu-holder[cuda]'",
+                    "suggestion": "Install NVML bindings with: python -m pip install 'gpu-holder[monitor]'",
                 }
             ],
         },

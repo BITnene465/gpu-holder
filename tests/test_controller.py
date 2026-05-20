@@ -7,7 +7,7 @@ import time
 
 import gpu_holder.controller as controller_mod
 import pytest
-from gpu_holder.controller import GuardController, build_status_payload
+from gpu_holder.controller import GuardController, build_status_payload, format_runtime_log_line
 from gpu_holder.config import GuardConfig, config_payload
 from gpu_holder.events import read_events, write_event
 from gpu_holder.models import DecisionAction, GpuProcess, GpuSnapshot, HolderDecision
@@ -164,6 +164,59 @@ def test_controller_status_includes_resolved_config(tmp_path) -> None:
 
     payload = json.loads((tmp_path / "status.json").read_text(encoding="utf-8"))
     assert payload["config"] == config_payload(controller.config)
+
+
+def test_runtime_log_line_summarizes_machine_and_gpus() -> None:
+    payload = {
+        "timestamp": 1,
+        "machine": {
+            "average_utilization": 86.5,
+            "policy_average_utilization": 84.2,
+            "owned_worker_count": 2,
+            "action_counts": {"hold": 2},
+        },
+        "config": {"target_util": 95},
+        "gpus": [
+            {
+                "index": 0,
+                "utilization": 87,
+                "memory_used_human": "16.5GiB",
+                "decision": {"action": "hold"},
+            }
+        ],
+    }
+
+    line = format_runtime_log_line(payload)
+
+    assert "avg=86.5%" in line
+    assert "policy=84.2%" in line
+    assert "target=95%" in line
+    assert "workers=2" in line
+    assert "actions=hold:2" in line
+    assert "gpus=0:87%/16.5GiB/hold" in line
+
+
+def test_controller_runtime_log_prints_and_writes_log_file(tmp_path, capsys) -> None:
+    controller = GuardController(GuardConfig(state_dir=tmp_path, log_interval=10))
+    payload = {
+        "timestamp": 1,
+        "machine": {
+            "average_utilization": 80,
+            "policy_average_utilization": 75,
+            "owned_worker_count": 1,
+            "action_counts": {"hold": 1},
+        },
+        "config": {"target_util": 95},
+        "gpus": [],
+    }
+
+    controller._maybe_log_runtime_status(payload)
+    controller._maybe_log_runtime_status(payload)
+
+    captured = capsys.readouterr()
+    assert captured.out.count("avg=80.0%") == 1
+    log_text = (tmp_path / "gpu-holder.log").read_text(encoding="utf-8")
+    assert log_text.count("avg=80.0%") == 1
 
 
 def test_controller_status_write_keeps_previous_status_when_replace_fails(

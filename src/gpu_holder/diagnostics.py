@@ -139,7 +139,7 @@ def _check_torch() -> DiagnosticCheck:
             detail=f"{type(exc).__name__}: {exc}",
             suggestion=(
                 "Install a CUDA-compatible PyTorch build for this machine. "
-                "For package metadata only, use: python -m pip install 'gpu-holder[cuda]'"
+                "For package metadata only, use: python -m pip install 'gpu-holder[torch]'"
             ),
         )
     try:

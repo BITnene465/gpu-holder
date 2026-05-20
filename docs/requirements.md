@@ -1,171 +1,64 @@
-# Requirements
+# 需求说明
 
-## Problem
+## 背景
 
-Some shared GPU machines are reclaimed when their hourly average GPU utilization
-falls below a threshold such as 70%. A simple memory holder is not enough:
+共享 GPU 机器常见的回收规则是：如果某个小时的平均 GPU 利用率低于阈值，例如 `70%`，机器会被回收。单纯占显存没有意义，因为显存占用不会提高 GPU 利用率；单纯写死计算负载又容易影响真实任务。
 
-- memory-only holders do not increase utilization
-- compute-only holders can interfere with real jobs
-- fixed-load holders waste resources when real jobs already keep the machine busy
+`gpu-holder` 要解决的是：在真实任务不足以撑起整机平均利用率时补计算负载；当真实任务出现时尽量让道。
 
-`gpu-holder` should keep machine utilization above a safe target while yielding
-to real workloads.
+## 功能需求
 
-## Functional Requirements
-
-- Monitor NVIDIA GPU utilization, memory, and per-process memory with NVML
-  when bindings are installed.
-- Fall back to `nvidia-smi` monitoring when NVML Python bindings are missing,
-  so the runtime can stay dependency-light on managed machines.
-- Deduplicate NVML process rows by PID before busy-process policy decisions.
-- Start holder workers on selected GPUs.
-- Allocate GPU memory with a configurable target:
-  - default: `20%`
-  - examples: `70%`, `10GiB`, `12000MiB`
-  - cap allocations by current free memory after reserve
-- Generate compute utilization with multiple CUDA programs:
+- 监控 NVIDIA GPU 利用率、显存、温度和 per-process 显存。
+- 优先使用 NVML；缺少 Python NVML 绑定时，使用 `nvidia-smi` fallback。
+- 支持选择 GPU：全部、指定列表、配置文件。
+- 启动每张卡独立 worker。
+- 默认显存占用为 `20%`，并支持：
+  - 百分比：`20%`
+  - GiB：`10GiB`
+  - MiB：`12000MiB`
+- 显存申请必须受当前空闲显存和 reserve 限制。
+- 支持多种 CUDA 计算程序：
   - matrix multiplication
   - convolution
   - FFT
-  - elementwise workloads
+  - elementwise
   - mixed rotation
-  - random selection
-  - user-defined comma-list rotation
-- Default target machine utilization: `75%`.
-- Fleet-level policy should avoid starting new holders when the current machine
-  average is already above target, unless a GPU is in low-util emergency.
-- Duty cycle should adapt to current utilization, per-GPU history, and machine
-  average instead of using a fixed busy/sleep ratio.
-- If a GPU stays below `50%` utilization for a full `60s` window, intervene.
-- If a non-holder process uses more than `10GiB`, normally yield that GPU.
-- If a non-holder process name matches `protected_process_patterns`, always
-  yield that GPU.
-- Low-util emergency intervention has higher priority than busy-process yield.
-- When emergency intervention happens on a busy GPU, use assist mode with
-  smaller memory allocation.
-- Read GPU temperature from NVML when available, and release/standby at or above
-  a configurable thermal limit.
-- Keep a thermal block active until a lower configurable resume temperature is
-  reached, avoiding worker oscillation near the limit.
-- Support foreground `tmux` usage.
-- Support lightweight daemon commands: `start`, `stop`, `status`.
-- Support runtime per-GPU disable and temporary auto-expiring per-GPU disable
-  for manual jobs.
-- Generate a systemd user service unit without installing or enabling it.
-- Report status age and stale state so users can detect a stopped or stuck
-  controller from `status` and the TUI dashboard.
-- Provide a script-friendly status health check with non-zero exit codes for
-  missing or stale status files.
-- Provide an optional utilization-target health check so scripts can fail when
-  the policy/window average is below the configured reclaim target.
-- Expose policy-window sample count and coverage so operators can distinguish
-  a warmed-up utilization window from startup data.
-- Forecast the remaining-window average utilization required to hit the target
-  and flag windows that are no longer recoverable.
-- Export the latest status as Prometheus text for external monitoring stacks,
-  including atomic node_exporter textfile output.
-- Generate Prometheus alerting rules for stale status, quota forecast risk,
-  target gaps, worker startup backoff, and thermal yielding.
-- Generate an importable Grafana dashboard JSON for the exported Prometheus
-  metrics.
-- Generate a monitoring bundle directory containing alert rules, dashboard JSON,
-  and import notes.
-- Show utilization-target health in the dashboard header so quota risk is
-  visible during terminal monitoring.
-- Provide a TUI dashboard for terminal environments.
-- Provide a non-interactive dashboard snapshot for SSH logs, issue reports, and
-  terminals where curses is not appropriate.
-- Let the TUI temporarily pause all holders for a bounded manual-work window.
-- Let the TUI temporarily disable the selected GPU for a bounded manual-work
-  window.
-- Let the TUI show the resolved runtime config without leaving the dashboard.
-- Let the TUI filter recent events to the selected GPU for focused debugging.
-- Let the TUI show a recent history summary without leaving the dashboard.
-- Let the TUI show current explanation findings and guidance without leaving
-  the dashboard.
-- Let the TUI show offline tuning advice for the resolved runtime config
-  without leaving the dashboard.
-- Let the TUI detail view explain the selected GPU decision reason and show
-  operator guidance from the shared reason reference.
-- Provide `plan` / dry-run output for policy debugging.
-- Provide a full startup preflight command that validates config, diagnostics,
-  runtime state directory readiness, pidfile readiness, visible GPU selection,
-  and would-be policy decisions without starting workers.
-- Provide a reason reference so policy decision strings are explainable without
-  reading source code.
-- Provide offline policy simulation over time-series traces.
-- Provide read-only runtime diagnostics with actionable suggestions for missing
-  NVML bindings, NVML runtime failures, and PyTorch CUDA issues.
-- Include a compact support report summary with target health, action counts,
-  decision reasons, event types, workers, and external process counts.
-- Provide a redacted support report mode for public issue reports that hides
-  local paths and process identity fields.
-- Require worker processes to report readiness within a configurable startup
-  timeout before they are considered running.
-- Allow event log inspection to filter by event type and GPU index for long
-  tmux/daemon runs.
-- Provide a read-only history summary command for recent event action/reason
-  counts, per-GPU worker churn, and thermal event debugging.
-- Provide a read-only explain command that turns current status and recent
-  events into operator findings with guidance.
-- Event log readers should tolerate corrupt or partial JSONL lines.
-- Support TOML config files for long-running deployments, with CLI values
-  overriding file values.
-- Support documented runtime profiles as default layers for common deployment
-  modes: balanced, conservative, quota, and compute-only.
-- Support scenario-oriented config recipes that print copyable TOML for common
-  deployments such as first rollout, strict quota, busy shared machine, and
-  compute-only usage.
-- Print the default TOML config without writing files for previews and docs.
-- Generate compact profile-friendly TOML files so profile defaults are not
-  accidentally overridden by explicit default fields.
-- Explain resolved config precedence, including which profile defaults are
-  applied or overridden by TOML and CLI flags.
-- Provide a config validation/preview command before starting long-running
-  guard processes.
-- Reject unknown TOML config keys so misspelled settings cannot silently fall
-  back to defaults.
-- Provide a documented config reference command with JSON output for generated
-  docs and integrations.
-- Provide generated shell completion scripts for common terminal shells.
-- Provide a generated command manual suitable for Markdown docs and manpage
-  packaging.
-- Support hold modes:
-  - `balanced`
-  - `memory-only`
-  - `compute-only`
-  - internal `assist`
+  - random
+  - 自定义逗号列表
+- 默认目标整机平均利用率为 `75%`。
+- 如果整机平均已经高于目标，不应继续启动新的 holder，除非单卡进入低利用率紧急介入。
+- 如果某张卡连续 `60s` 低于 `50%`，必须介入。
+- 如果某张卡存在超过 `10GiB` 显存的非 holder 进程，通常让道。
+- 低利用率紧急介入优先级高于大进程让道。
+- 如果在忙卡上紧急介入，使用 assist 模式降低显存占用。
+- 支持 protected process pattern，匹配后强制让道。
+- 支持温度释放和恢复 hysteresis。
+- 支持 tmux 前台运行。
+- 支持轻量后台 daemon：`start`、`stop`、`status`。
+- 支持非交互 CLI 状态快照。
+- 支持 runtime pause / resume。
+- 支持单卡临时禁用和自动恢复。
+- 支持 systemd user service unit 生成，但不自动安装。
+- 支持状态 stale 检测和脚本友好的健康检查。
+- 支持 Prometheus metrics、告警规则、Grafana dashboard。
+- 支持 read-only support report。
+- 支持离线策略模拟和调参建议。
 
-## Non-Goals
+## 非功能需求
 
-- Do not kill user processes.
-- Treat external process PIDs as read-only scheduling signals.
-- Do not require systemd.
-- Do not hide GPU usage.
-- Do not support non-NVIDIA GPUs in the first release.
-- Do not promise exact per-second utilization; use rolling windows and duty
-  cycle control.
+- 基础包零三方依赖。
+- CUDA/PyTorch/NVML 都应位于 optional extras 或运行时导入路径。
+- CLI 使用 `pyproject.toml` 管理，后续可直接打包发布。
+- 代码必须可测试，策略逻辑不依赖真实 GPU。
+- 外部 GPU 进程只能作为只读调度信号。
+- 任何命令都不得 kill、suspend、renice 非 holder 进程。
 
-## Defaults
+## 验收标准
 
-| Setting | Default |
-| --- | --- |
-| target utilization | `75%` |
-| low-util emergency threshold | `50%` |
-| low-util window | `60s` |
-| memory hold | `20%` |
-| busy process threshold | `10GiB` |
-| protected process patterns | `[]` |
-| reserve memory | `2GiB` |
-| assist memory | `512MiB` |
-| max GPU temperature | `85C` |
-| thermal resume temperature | `80C` |
-| sample interval | `2s` |
-| program | `mixed` |
-| compute burst | `0.20s` |
-| compute burst jitter | `0.20` |
-| worker duty update threshold | `0.05` |
-| min duty cycle | `0.10` |
-| max duty cycle | `1.0` |
-| duty weights | `0.45 / 0.25 / 0.30` |
+- `python -m pytest -q` 通过。
+- `python -m ruff check --no-cache src tests` 通过。
+- `compileall` 通过。
+- `gpu-holder doctor` 能解释当前机器缺少或具备哪些运行时能力。
+- `gpu-holder plan --fake`、`simulate`、`tune` 不触碰 GPU worker。
+- 在明确选择的 GPU 上真实运行时，能产生计算利用率，而不是只占显存。
+- `gpu-holder stop` 只停止自己的 daemon。

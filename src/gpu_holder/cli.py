@@ -30,7 +30,7 @@ from .config import (
     validate_config_keys,
 )
 from .completion import generate_completion
-from .controller import GuardController, read_status, read_status_result
+from .controller import GuardController, read_status_result
 from .diagnostics import run_diagnostics
 from .events import filter_events, read_events, read_events_since
 from .explain import explain_runtime, format_explanation
@@ -320,24 +320,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="mark status as stale after this many seconds; use 0 to disable",
     )
     explain_parser.add_argument("--json", action="store_true")
-    dashboard_parser = subparsers.add_parser("dashboard", help="open the terminal status dashboard")
+    dashboard_parser = subparsers.add_parser("dashboard", help="print a terminal status snapshot")
     dashboard_parser.add_argument("--state-dir", default=str(DEFAULT_STATE_DIR))
-    dashboard_parser.add_argument("--refresh-interval", type=float, default=2.0)
-    dashboard_parser.add_argument(
-        "--temporary-disable-duration",
-        default="30m",
-        help="duration used by the dashboard D key, e.g. 30s, 10m, 2h",
-    )
-    dashboard_parser.add_argument(
-        "--temporary-pause-duration",
-        default="10m",
-        help="duration used by the dashboard P key, e.g. 30s, 10m, 2h",
-    )
-    dashboard_parser.add_argument("--once", action="store_true", help="render one text snapshot and exit")
-    dashboard_parser.add_argument("--events", action="store_true", help="include recent events with --once")
-    dashboard_parser.add_argument("--history", action="store_true", help="include recent history summary with --once")
-    dashboard_parser.add_argument("--explain", action="store_true", help="include current explanation with --once")
-    dashboard_parser.add_argument("--advice", action="store_true", help="include offline tuning advice with --once")
+    dashboard_parser.add_argument("--once", action="store_true", help="compatibility flag; dashboard is always one-shot")
+    dashboard_parser.add_argument("--events", action="store_true", help="include recent events")
+    dashboard_parser.add_argument("--history", action="store_true", help="include recent history summary")
+    dashboard_parser.add_argument("--explain", action="store_true", help="include current explanation")
+    dashboard_parser.add_argument("--advice", action="store_true", help="include offline tuning advice")
     dashboard_parser.add_argument("--history-limit", type=int, default=5000, help="recent events to inspect for dashboard history")
     dashboard_parser.add_argument("--config", action="store_true", help="show resolved config with --once")
     dashboard_parser.add_argument("--details", type=int, default=None, help="show one GPU detail with --once")
@@ -452,8 +441,13 @@ def _add_guard_like(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--compute-burst-jitter", type=float, default=None)
     parser.add_argument("--state-dir", default=None)
     parser.add_argument("--pause-file", default=None)
+    parser.add_argument(
+        "--log-interval",
+        type=float,
+        default=None,
+        help="seconds between compact runtime log lines; use 0 to log every sample",
+    )
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--tui", action="store_true")
     parser.add_argument("--fake", action="store_true", help="use fake snapshots for planning")
     parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
 
@@ -517,12 +511,6 @@ def _cmd_start(args: argparse.Namespace) -> int:
     command = [sys.executable, "-m", "gpu_holder.cli", "guard", *_guard_args_for_child(args, config)]
     log = config.log_file.open("ab")
     env = os.environ.copy()
-    source_root = str(Path(__file__).resolve().parents[1])
-    env["PYTHONPATH"] = (
-        source_root
-        if not env.get("PYTHONPATH")
-        else f"{source_root}{os.pathsep}{env['PYTHONPATH']}"
-    )
     process = subprocess.Popen(
         command,
         stdout=log,
@@ -1209,54 +1197,34 @@ def follow_events(
 
 
 def _cmd_dashboard(args: argparse.Namespace) -> int:
-    from .tui import format_dashboard_snapshot, run_status_dashboard
+    from .dashboard import format_dashboard_snapshot
 
     state_dir = Path(args.state_dir).expanduser()
     status_file = state_dir / "status.json"
     event_log = state_dir / "events.jsonl"
-    try:
-        temporary_disable_seconds = parse_duration_seconds(args.temporary_disable_duration)
-    except ValueError as exc:
-        print(f"invalid --temporary-disable-duration: {exc}", file=sys.stderr)
-        return 2
-    try:
-        temporary_pause_seconds = parse_duration_seconds(args.temporary_pause_duration)
-    except ValueError as exc:
-        print(f"invalid --temporary-pause-duration: {exc}", file=sys.stderr)
-        return 2
-    if args.once:
-        payload, status_error = read_status_result(status_file)
-        if payload is None:
-            print(status_error or "no status file")
-            return 1
-        event_limit = args.history_limit if args.history or args.explain else 8
-        events = (
-            read_events(event_log, limit=event_limit)
-            if args.events or args.history or args.explain or args.event_gpu is not None
-            else []
-        )
-        lines = format_dashboard_snapshot(
-            payload,
-            events=events,
-            show_events=bool(args.events or args.event_gpu is not None),
-            show_history=bool(args.history),
-            show_explain=bool(args.explain),
-            show_advice=bool(args.advice),
-            show_config=bool(args.config),
-            show_detail=args.details is not None,
-            selected_gpu_index=args.details,
-            event_filter_gpu_index=args.event_gpu,
-        )
-        print("\n".join(lines))
-        return 0
-    run_status_dashboard(
-        status_reader=lambda: read_status(status_file),
-        event_reader=lambda: read_events(event_log, limit=args.history_limit),
-        state_dir=state_dir,
-        refresh_interval=args.refresh_interval,
-        temporary_disable_seconds=temporary_disable_seconds,
-        temporary_pause_seconds=temporary_pause_seconds,
+    payload, status_error = read_status_result(status_file)
+    if payload is None:
+        print(status_error or "no status file")
+        return 1
+    event_limit = args.history_limit if args.history or args.explain else 8
+    events = (
+        read_events(event_log, limit=event_limit)
+        if args.events or args.history or args.explain or args.event_gpu is not None
+        else []
     )
+    lines = format_dashboard_snapshot(
+        payload,
+        events=events,
+        show_events=bool(args.events or args.event_gpu is not None),
+        show_history=bool(args.history),
+        show_explain=bool(args.explain),
+        show_advice=bool(args.advice),
+        show_config=bool(args.config),
+        show_detail=args.details is not None,
+        selected_gpu_index=args.details,
+        event_filter_gpu_index=args.event_gpu,
+    )
+    print("\n".join(lines))
     return 0
 
 
@@ -2506,8 +2474,10 @@ def _config_from_args(args: argparse.Namespace) -> GuardConfig:
                 str(_config_value(args, profiled_config, "state_dir", default.state_dir))
             ).expanduser(),
             pause_file=_optional_path(_config_value(args, profiled_config, "pause_file", None)),
+            log_interval=float(
+                _config_value(args, profiled_config, "log_interval", default.log_interval)
+            ),
             dry_run=bool(args.dry_run),
-            tui=bool(args.tui),
             source_errors=source_errors,
         )
     except (argparse.ArgumentTypeError, TypeError, ValueError) as exc:
@@ -2855,6 +2825,8 @@ def _guard_args_for_child(args: argparse.Namespace, config: GuardConfig) -> list
         str(config.compute_burst_jitter),
         "--state-dir",
         str(config.state_dir),
+        "--log-interval",
+        str(config.log_interval),
     ]
     for pattern in config.protected_process_patterns:
         result.extend(["--protected-process", pattern])
@@ -2864,8 +2836,6 @@ def _guard_args_for_child(args: argparse.Namespace, config: GuardConfig) -> list
         result.extend(["--pause-file", str(config.pause_file)])
     if config.dry_run:
         result.append("--dry-run")
-    if config.tui:
-        result.append("--tui")
     return result
 
 

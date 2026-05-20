@@ -76,8 +76,8 @@ def config_from_status_config(raw_config: object) -> GuardConfig:
         max_held_gpus=_optional_int(raw_config.get("max_held_gpus", default.max_held_gpus)),
         state_dir=Path(str(raw_config.get("state_dir", default.state_dir))).expanduser(),
         pause_file=_optional_path(raw_config.get("pause_file", default.pause_file)),
+        log_interval=float(raw_config.get("log_interval", default.log_interval)),
         dry_run=bool(raw_config.get("dry_run", default.dry_run)),
-        tui=bool(raw_config.get("tui", default.tui)),
     )
 
 

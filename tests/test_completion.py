@@ -52,8 +52,8 @@ def test_command_reference_lists_manual_and_completion_metadata() -> None:
     assert "--explain" in commands["dashboard"]["flags"]
     assert "--advice" in commands["dashboard"]["flags"]
     assert "--history-limit" in commands["dashboard"]["flags"]
-    assert "--temporary-disable-duration" in commands["dashboard"]["flags"]
-    assert "--temporary-pause-duration" in commands["dashboard"]["flags"]
+    assert "--temporary-disable-duration" not in commands["dashboard"]["flags"]
+    assert "--temporary-pause-duration" not in commands["dashboard"]["flags"]
     assert commands["completion"]["flags"] == ["bash", "zsh", "fish"]
 
 
@@ -82,7 +82,7 @@ def test_zsh_completion_contains_command_descriptions_and_options() -> None:
     script = generate_completion("zsh")
 
     assert "#compdef gpu-holder" in script
-    assert "'dashboard:open the terminal status dashboard'" in script
+    assert "'dashboard:print a terminal status snapshot'" in script
     assert "'--state-dir'" in script
     assert "'--once'" in script
     assert "'--check'" in script

@@ -1,42 +1,48 @@
-# Contributing
+# 贡献指南
 
-Thanks for improving `gpu-holder`.
+感谢改进 `gpu-holder`。这个项目优先保持边界清楚、依赖极少、行为可预测。
 
-## Development
+## 开发环境
+
+推荐使用项目自己的虚拟环境：
 
 ```bash
-python -m pip install -e ".[dev]"
-PYTHONPATH=src python -m pytest -q
-PYTHONPATH=src python -m gpu_holder.cli plan --fake
+cd /root/workspace/nene/gpu-holder
+virtualenv --python /usr/bin/python3.10 --system-site-packages --clear .venv
+.venv/bin/python -m pip install --no-build-isolation -e ".[dev]"
 ```
 
-CUDA smoke tests must be run manually on an idle or explicitly selected GPU.
-Never run real holder workers on a busy shared machine unless you own the target
-GPU.
+常用检查：
 
-## Safety Invariant
+```bash
+.venv/bin/python -m pytest -q
+.venv/bin/python -m ruff check --no-cache src tests
+PYTHONPYCACHEPREFIX=/tmp/gpu-holder-pycache .venv/bin/python -m compileall -q src tests
+```
 
-External GPU processes are read-only scheduling signals. Contributions must not
-add code that kills, suspends, renices, or otherwise controls non-holder PIDs.
+真实 CUDA smoke 只能在空闲 GPU 或你明确拥有的 GPU 上运行。不要在繁忙共享机器上随意启动真实 holder worker。
 
-Acceptable:
+## 安全不变量
 
-- stop a worker process created by `gpu-holder`
-- read NVML process metadata
-- write status files
+外部 GPU 进程是只读调度信号。贡献代码不得 kill、suspend、renice 或以其他方式控制非 holder PID。
 
-Not acceptable:
+允许：
 
-- kill a training process
-- free another process' memory
-- shell out to destructive process-management commands
+- 停止 `gpu-holder` 自己创建的 worker。
+- 读取 NVML 或 `nvidia-smi` 的进程元数据。
+- 写状态文件、事件日志和监控指标。
 
-## Pull Request Checklist
+不允许：
 
-- Add or update tests for policy changes.
-- Keep default dependencies minimal.
-- Put CUDA-specific imports behind runtime paths or optional extras.
-- Update `README.md` and `docs/` when behavior changes.
-- Update `CHANGELOG.md` for user-visible changes.
-- Check `docs/release.md` before tagging a release.
-- Confirm `pytest -q` and `ruff check src tests` pass.
+- kill 训练、推理或服务进程。
+- 释放其他进程的显存。
+- shell out 到破坏性进程管理命令。
+
+## PR 检查清单
+
+- 策略变更需要补测试。
+- 默认依赖保持最小化。
+- CUDA/PyTorch/NVML 导入必须放在运行时路径或 optional extras 后面。
+- 行为变化需要更新 `README.md`、`docs/` 和 `CHANGELOG.md`。
+- 发布前检查 `docs/release.md`。
+- 确认 pytest、ruff、compileall 通过。

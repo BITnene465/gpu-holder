@@ -1,107 +1,81 @@
-# Release Checklist
+# 发布检查清单
 
-Use this checklist before publishing a new `gpu-holder` release.
+发布 `gpu-holder` 前按此清单确认。
 
-## Preflight
+## 发布前检查
 
-- Confirm the release scope is documented in `CHANGELOG.md`.
-- Confirm `README.md`, `docs/`, and `examples/gpu-holder.toml` match the
-  current CLI behavior.
-- Confirm `examples/monitoring/` still matches metrics, alerts, and Grafana
-  dashboard commands.
-- Confirm no code path controls external GPU processes. External PIDs must
-  remain read-only scheduling signals.
-- Confirm default dependencies remain minimal and CUDA/PyTorch imports stay
-  behind optional runtime paths.
+- `CHANGELOG.md` 已记录本次用户可见变化。
+- `README.md`、`docs/`、`examples/` 与当前 CLI 行为一致。
+- 默认依赖仍然最小化，基础包不强依赖 PyTorch 或 NVML。
+- CUDA/PyTorch/NVML 导入都在运行时路径或 optional extras 后面。
+- 外部 GPU 进程仍然只是只读调度信号。
+- 不要 kill 现有用户 GPU 任务。
+- `gpu-holder start` 跟随当前 CLI 解释器，不主动注入源码树 `PYTHONPATH`。
 
-## Local Verification
+## 本地验证
 
-Run these from the project root:
+建议在独立虚拟环境中执行：
 
 ```bash
-python -m ruff check src tests
-python -m pytest -q
-PYTHONPYCACHEPREFIX=/tmp/gpu-holder-pycache python -m compileall -q src tests
-PYTHONPATH=src python -m gpu_holder --version
-PYTHONPATH=src python -m gpu_holder init-config --stdout
-PYTHONPATH=src python -m gpu_holder init-config --profile quota --stdout
-PYTHONPATH=src python -m gpu_holder recipes
-PYTHONPATH=src python -m gpu_holder recipes --name busy-shared
-PYTHONPATH=src python -m gpu_holder plan --fake --json
-PYTHONPATH=src python -m gpu_holder preflight --fake --no-diagnostics --json
-PYTHONPATH=src python -m gpu_holder simulate --scenario all --json
-PYTHONPATH=src python -m gpu_holder tune --strict --json
-PYTHONPATH=src python -m gpu_holder tune --compare-profiles --json
-PYTHONPATH=src python -m gpu_holder config --profile quota --explain --json
-PYTHONPATH=src python -m gpu_holder config-reference --json
-PYTHONPATH=src python -m gpu_holder profile-reference --json
-PYTHONPATH=src python -m gpu_holder reason-reference --json
-PYTHONPATH=src python -m gpu_holder completion bash
-PYTHONPATH=src python -m gpu_holder manual --format man
-PYTHONPATH=src python -m gpu_holder alerts --json
-PYTHONPATH=src python -m gpu_holder grafana-dashboard
-PYTHONPATH=src python -m gpu_holder monitoring-bundle --output-dir /tmp/gpu-holder-monitoring --json
-PYTHONPATH=src python -m gpu_holder service --config /tmp/gpu-holder.toml
-python -m build
+virtualenv --python /usr/bin/python3.10 --system-site-packages --clear .venv
+.venv/bin/python -m pip install --no-build-isolation -e ".[dev]"
+uv lock --check
+.venv/bin/python -m ruff check --no-cache src tests
+.venv/bin/python -m pytest -q
+PYTHONPYCACHEPREFIX=/tmp/gpu-holder-pycache .venv/bin/python -m compileall -q src tests
+.venv/bin/gpu-holder --version
+.venv/bin/gpu-holder init-config --stdout
+.venv/bin/gpu-holder recipes
+.venv/bin/gpu-holder plan --fake --json
+.venv/bin/gpu-holder preflight --fake --no-diagnostics --json
+.venv/bin/gpu-holder simulate --scenario all --json
+.venv/bin/gpu-holder tune --strict --json
+.venv/bin/gpu-holder config-reference --json
+.venv/bin/gpu-holder profile-reference --json
+.venv/bin/gpu-holder reason-reference --json
+.venv/bin/gpu-holder completion bash
+.venv/bin/gpu-holder manual --format man
+.venv/bin/gpu-holder alerts --json
+.venv/bin/gpu-holder grafana-dashboard
+.venv/bin/gpu-holder monitoring-bundle --output-dir /tmp/gpu-holder-monitoring --json
+.venv/bin/python -m build
 ```
 
-Optional read-only runtime check:
+只读运行时检查：
 
 ```bash
-PYTHONPATH=src python -m gpu_holder doctor --json
-PYTHONPATH=src python -m gpu_holder status --check
-PYTHONPATH=src python -m gpu_holder status --check --require-target
-PYTHONPATH=src python -m gpu_holder status --check --require-forecast
-PYTHONPATH=src python -m gpu_holder metrics
-PYTHONPATH=src python -m gpu_holder metrics --output /tmp/gpu-holder.prom
-PYTHONPATH=src python -m gpu_holder dashboard --once
-PYTHONPATH=src python -m gpu_holder dashboard --once --history
-PYTHONPATH=src python -m gpu_holder dashboard --once --explain
-PYTHONPATH=src python -m gpu_holder dashboard --once --advice
-PYTHONPATH=src python -m gpu_holder explain
+.venv/bin/gpu-holder doctor --json
+.venv/bin/gpu-holder status --check
+.venv/bin/gpu-holder metrics
+.venv/bin/gpu-holder dashboard --once
+.venv/bin/gpu-holder explain
 ```
 
-`doctor` may return a non-zero exit code on machines without both monitoring
-backends (`pynvml`/NVML and `nvidia-smi`) or without CUDA-capable PyTorch.
-Missing NVML Python bindings alone are acceptable when `doctor` reports the
-`nvidia-smi` fallback backend as healthy. `status --check` and
-`dashboard --once` return non-zero when no status file exists.
-`status --check --require-target` can also return non-zero when the recorded
-utilization target is not met. `status --check --require-forecast` can return
-non-zero when the remaining-window target forecast is unrecoverable. Those are
-acceptable if the output is accurate.
+`status --check` 在没有 daemon 或状态 stale 时返回非零是正常的；关键是输出要准确。
 
-## Manual GPU Smoke
+## 真实 GPU smoke
 
-Only run real holder workers on an idle GPU or a GPU you explicitly own.
-
-Recommended smoke:
+只在空闲 GPU 或你明确拥有的 GPU 上运行：
 
 ```bash
-gpu-holder plan --fake
-gpu-holder guard --gpus 0 --dry-run --tui
+.venv/bin/gpu-holder guard --gpus 7 --mem 2GiB --program matmul --min-duty-cycle 1 --max-duty-cycle 1
 ```
 
-For real CUDA worker validation, use a short supervised tmux session on an idle
-GPU and verify:
+验证：
 
-- status updates every sample interval
-- `gpu-holder pause` releases owned workers
-- `gpu-holder pause --for 1m` auto-expires without manual resume
-- `gpu-holder history --since 5m` summarizes recent events without touching workers
-- `gpu-holder explain` reports operator guidance without touching workers
-- `gpu-holder disable-gpu 0` releases and skips that GPU
-- `gpu-holder disable-gpu 0 --for 1m` auto-expires without manual enable
-- `gpu-holder stop` refuses to stop non-holder PIDs
+- status 按 sample interval 更新。
+- `pause` 释放自有 worker。
+- `pause --for 1m` 自动过期。
+- `disable-gpu 7 --for 1m` 自动恢复。
+- `history --since 5m` 不触碰 worker。
+- `explain` 给出可读建议。
+- `stop` 拒绝非 holder PID。
 
-Do not kill existing user GPU jobs during release validation.
+## 发布
 
-## Publish
-
-- Update version in `pyproject.toml`.
-- Move `CHANGELOG.md` entries from `Unreleased` to the version section.
-- Confirm `pyproject.toml` URLs point at the published GitHub repository.
-- Tag the release.
-- Confirm CI is green for supported Python versions.
-- Attach notes that mention safety behavior, supported Python versions, and
-  optional CUDA dependencies.
+- 更新 `pyproject.toml` 版本号。
+- 把 `CHANGELOG.md` 的 `[未发布]` 移到正式版本段。
+- 确认项目 URL 指向真实 GitHub 仓库。
+- 打 tag。
+- 确认 CI 通过 Python 3.10。
+- 发布说明必须提到安全边界、支持的 Python 版本、optional CUDA 依赖。

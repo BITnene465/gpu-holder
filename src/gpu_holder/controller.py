@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import sys
 import time
 from typing import Iterable
 
@@ -31,6 +32,7 @@ class GuardController:
         self._seen_non_holder_pids_by_gpu: dict[int, set[int]] = {}
         self._process_grace_until: dict[int, float] = {}
         self._thermal_blocked_gpu_indices: set[int] = set()
+        self._last_runtime_log_monotonic: float | None = None
         self._stop = False
 
     def run(self) -> None:
@@ -53,11 +55,8 @@ class GuardController:
                 self.record_decisions(decisions)
                 if not self.config.dry_run:
                     self.apply(decisions)
-                self.write_status(snapshots=snapshots, decisions=decisions)
-                if self.config.tui:
-                    from .tui import render_once
-
-                    render_once(snapshots=snapshots, decisions=decisions, config=self.config)
+                status_payload = self.write_status(snapshots=snapshots, decisions=decisions)
+                self._maybe_log_runtime_status(status_payload)
                 time.sleep(float(self.config.sample_interval))
         finally:
             self.release_all()
@@ -207,7 +206,7 @@ class GuardController:
         *,
         snapshots: Iterable[GpuSnapshot],
         decisions: Iterable[HolderDecision],
-    ) -> None:
+    ) -> dict[str, object]:
         self.config.state_dir.mkdir(parents=True, exist_ok=True)
         pause_state = read_pause_state_file(self.config.resolved_pause_file)
         disabled_gpu_state = read_disabled_gpu_state(self.config.state_dir)
@@ -229,6 +228,7 @@ class GuardController:
             disabled_gpu_expirations=disabled_gpu_state.disabled_until_by_gpu,
         )
         write_text_atomically(self.config.status_file, json.dumps(payload, indent=2))
+        return payload
 
     def _holder_pids(self) -> set[int]:
         return {
@@ -425,6 +425,23 @@ class GuardController:
             **payload,
         )
 
+    def _maybe_log_runtime_status(self, payload: dict[str, object]) -> None:
+        now = time.monotonic()
+        interval = float(self.config.log_interval)
+        if (
+            self._last_runtime_log_monotonic is not None
+            and interval > 0
+            and now - self._last_runtime_log_monotonic < interval
+        ):
+            return
+        self._last_runtime_log_monotonic = now
+        line = format_runtime_log_line(payload)
+        print(line, flush=True)
+        if not _stdout_targets_log_file(self.config.log_file):
+            self.config.state_dir.mkdir(parents=True, exist_ok=True)
+            with self.config.log_file.open("a", encoding="utf-8") as handle:
+                handle.write(line + "\n")
+
 
 def build_status_payload(
     *,
@@ -524,6 +541,61 @@ def build_status_payload(
             for snapshot in snapshots
         ],
     }
+
+
+def format_runtime_log_line(payload: dict[str, object]) -> str:
+    timestamp = _float_payload_value(payload.get("timestamp"), default=time.time())
+    machine = payload.get("machine") if isinstance(payload.get("machine"), dict) else {}
+    config = payload.get("config") if isinstance(payload.get("config"), dict) else {}
+    gpus = payload.get("gpus") if isinstance(payload.get("gpus"), list) else []
+    actions = machine.get("action_counts") if isinstance(machine, dict) else {}
+    actions_text = _format_counts(actions if isinstance(actions, dict) else {})
+    gpu_text = " ".join(_format_gpu_runtime_part(gpu) for gpu in gpus if isinstance(gpu, dict))
+    return (
+        f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(timestamp))} "
+        f"avg={_float_payload_value(machine.get('average_utilization')):.1f}% "
+        f"policy={_float_payload_value(machine.get('policy_average_utilization')):.1f}% "
+        f"target={_float_payload_value(config.get('target_util')):.0f}% "
+        f"workers={int(_float_payload_value(machine.get('owned_worker_count')))} "
+        f"actions={actions_text} "
+        f"gpus={gpu_text}"
+    )
+
+
+def _format_gpu_runtime_part(gpu: dict[str, object]) -> str:
+    decision = gpu.get("decision") if isinstance(gpu.get("decision"), dict) else {}
+    action = decision.get("action", "-") if isinstance(decision, dict) else "-"
+    return (
+        f"{gpu.get('index', '?')}:"
+        f"{_float_payload_value(gpu.get('utilization')):.0f}%/"
+        f"{gpu.get('memory_used_human', '?')}/"
+        f"{action}"
+    )
+
+
+def _format_counts(counts: dict[object, object]) -> str:
+    if not counts:
+        return "-"
+    return ",".join(
+        f"{key}:{int(_float_payload_value(value))}"
+        for key, value in sorted(counts.items(), key=lambda item: str(item[0]))
+    )
+
+
+def _float_payload_value(value: object, *, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _stdout_targets_log_file(log_file: Path) -> bool:
+    try:
+        stdout_stat = os.fstat(sys.stdout.fileno())
+        log_stat = log_file.stat()
+    except (AttributeError, FileNotFoundError, OSError):
+        return False
+    return stdout_stat.st_dev == log_stat.st_dev and stdout_stat.st_ino == log_stat.st_ino
 
 
 def _configured_max_gpu_temp(config: dict[str, object]) -> int | None:

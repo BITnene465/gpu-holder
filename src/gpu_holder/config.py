@@ -61,6 +61,7 @@ protected_process_patterns = []
 
 # Runtime files.
 state_dir = "~/.gpu-holder"
+log_interval = 10
 event_log_max_size = "10MiB"
 event_log_backup_count = 3
 worker_restart_backoff = 30
@@ -254,8 +255,8 @@ class GuardConfig:
     max_held_gpus: int | None = None
     state_dir: Path = DEFAULT_STATE_DIR
     pause_file: Path | None = None
+    log_interval: float = 10.0
     dry_run: bool = False
-    tui: bool = False
     source_errors: tuple[str, ...] = ()
 
     @property
@@ -526,6 +527,15 @@ def config_reference() -> list[dict[str, object]]:
             None,
         ),
         ConfigField(
+            "log_interval",
+            "--log-interval",
+            "seconds",
+            default.log_interval,
+            "observability",
+            "Interval for compact runtime summary logs. Use 0 to log every controller sample.",
+            "10",
+        ),
+        ConfigField(
             "event_log_max_size",
             "--event-log-max-size",
             "absolute memory spec",
@@ -659,12 +669,12 @@ def config_payload(config: GuardConfig) -> dict[str, object]:
         "max_held_gpus": config.max_held_gpus,
         "state_dir": str(config.state_dir),
         "pause_file": str(config.pause_file) if config.pause_file else None,
+        "log_interval": config.log_interval,
         "pid_file": str(config.pid_file),
         "status_file": str(config.status_file),
         "event_log_file": str(config.event_log_file),
         "log_file": str(config.log_file),
         "dry_run": config.dry_run,
-        "tui": config.tui,
     }
 
 
@@ -737,6 +747,8 @@ def validate_config(config: GuardConfig) -> tuple[list[str], list[str]]:
         warnings.append(f"duty cycle weights sum to {weight_sum:.3f}, not 1.0")
     if config.event_log_max_bytes <= 0:
         errors.append("event_log_max_bytes must be positive")
+    if config.log_interval < 0:
+        errors.append("log_interval must be non-negative")
     if config.event_log_backup_count < 0:
         errors.append("event_log_backup_count must be non-negative")
     if config.worker_restart_backoff < 0:

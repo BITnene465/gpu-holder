@@ -1,19 +1,16 @@
-## Summary
+## 变更摘要
 
 - 
 
-## Verification
+## 验证
 
-- [ ] `python -m ruff check src tests`
-- [ ] `PYTHONPATH=src python -m pytest -q`
-- [ ] `python -m compileall -q src tests`
-- [ ] Updated docs/examples when behavior changed
+- [ ] `python -m ruff check --no-cache src tests`
+- [ ] `python -m pytest -q`
+- [ ] `PYTHONPYCACHEPREFIX=/tmp/gpu-holder-pycache python -m compileall -q src tests`
+- [ ] 行为变化已同步更新文档或示例
 
-## Safety
+## 安全
 
-- [ ] This change does not kill, suspend, renice, or otherwise control external
-      GPU processes.
-- [ ] External GPU process metadata is used only as a read-only scheduling
-      signal.
-- [ ] Any real CUDA smoke test was run only on an idle GPU or a GPU explicitly
-      owned by the tester.
+- [ ] 本次变更不会 kill、suspend、renice 或以其他方式控制外部 GPU 进程。
+- [ ] 外部 GPU 进程元数据只作为只读调度信号。
+- [ ] 真实 CUDA smoke 只在空闲 GPU 或测试者明确拥有的 GPU 上运行。

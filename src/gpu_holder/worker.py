@@ -143,7 +143,8 @@ def _worker_main(
         import torch
     except ImportError as exc:
         raise RuntimeError(
-            "GPU workers require PyTorch. Install with: pip install 'gpu-holder[cuda]'"
+            "GPU workers require PyTorch. Install a CUDA-enabled torch build for this machine "
+            "or use: pip install 'gpu-holder[torch]'"
         ) from exc
 
     torch.cuda.set_device(int(gpu_index))
