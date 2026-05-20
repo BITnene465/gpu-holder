@@ -4,11 +4,14 @@ import pytest
 
 import gpu_holder.worker as worker_mod
 from gpu_holder.worker import (
+    MATMUL_SIZE,
     WorkerProcess,
     WorkerStartError,
+    _PROGRAM_CACHE,
     _jittered_burst_seconds,
     _next_program,
     _program_sequence,
+    _run_program,
     _sleep_seconds_for_duty,
 )
 
@@ -67,6 +70,49 @@ def test_sleep_seconds_for_duty_preserves_average_duty() -> None:
     assert _sleep_seconds_for_duty(burst_seconds=0.2, duty=0.5) == 0.2
     assert _sleep_seconds_for_duty(burst_seconds=0.2, duty=1.0) == 0.0
     assert _sleep_seconds_for_duty(burst_seconds=0.2, duty=0.0) == 1.0
+
+
+def test_matmul_program_reuses_large_cached_tensors() -> None:
+    class FakeCuda:
+        def __init__(self) -> None:
+            self.sync_devices: list[str] = []
+
+        def synchronize(self, device: str) -> None:
+            self.sync_devices.append(device)
+
+    class FakeTorch:
+        float16 = "float16"
+
+        def __init__(self) -> None:
+            self.cuda = FakeCuda()
+            self.randn_calls: list[tuple[tuple[int, int], str, str]] = []
+            self.empty_calls: list[tuple[tuple[int, int], str, str]] = []
+            self.mm_calls = 0
+
+        def randn(self, shape, *, dtype: str, device: str):
+            self.randn_calls.append((shape, dtype, device))
+            return {"shape": shape, "dtype": dtype, "device": device, "kind": "randn"}
+
+        def empty(self, shape, *, dtype: str, device: str):
+            self.empty_calls.append((shape, dtype, device))
+            return {"shape": shape, "dtype": dtype, "device": device, "kind": "empty"}
+
+        def mm(self, a, b, *, out) -> None:
+            assert a["shape"] == (MATMUL_SIZE, MATMUL_SIZE)
+            assert b["shape"] == (MATMUL_SIZE, MATMUL_SIZE)
+            assert out["shape"] == (MATMUL_SIZE, MATMUL_SIZE)
+            self.mm_calls += 1
+
+    fake_torch = FakeTorch()
+    _PROGRAM_CACHE.clear()
+
+    _run_program(torch=fake_torch, name="matmul", gpu_index=0)
+    _run_program(torch=fake_torch, name="matmul", gpu_index=0)
+
+    assert len(fake_torch.randn_calls) == 2
+    assert len(fake_torch.empty_calls) == 1
+    assert fake_torch.mm_calls == 2
+    assert fake_torch.cuda.sync_devices == ["cuda:0", "cuda:0"]
 
 
 def test_worker_start_timeout_stops_unready_live_process(monkeypatch) -> None:

@@ -17,28 +17,28 @@ from .worker import WorkerProcess
 
 STATE_DIR = Path.home() / ".gpu-holder"
 BASE_PROGRAMS = {"matmul", "conv", "fft", "elementwise", "mixed", "random"}
-TARGET_RELEASE_MARGIN = 0.03
 
 
 @dataclass(frozen=True)
 class Config:
     gpus: tuple[int, ...] | str = "all"
     target_util: float = 0.75
-    idle_util: int = 50
-    idle_window: float = 60.0
+    risk_util: float = 0.5
     mem: float = 0.2
     reserve: str = "2GiB"
     busy_process_mem_threshold: str = "10GiB"
     assist_mem: str = "512MiB"
     sample_interval: float = 2.0
     program: str = "matmul"
-    min_duty_cycle: float = 1.0
+    min_duty_cycle: float = 0.0
     max_duty_cycle: float = 1.0
-    compute_burst_seconds: float = 2.0
+    compute_burst_seconds: float = 0.2
     compute_burst_jitter: float = 0.0
-    process_grace_window: float = 0.0
+    process_grace_window: float = 120.0
     state_dir: Path = STATE_DIR
     log_interval: float = 10.0
+    dry_run: bool = False
+    once: bool = False
 
     @property
     def pid_file(self) -> Path:
@@ -110,7 +110,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = parser.add_subparsers(dest="command")
-    add_run_args(sub.add_parser("guard", help="run in foreground"))
+    add_run_args(sub.add_parser("guard", help="run in foreground"), include_controls=True)
     add_run_args(sub.add_parser("start", help="start background guard"))
     stop = sub.add_parser("stop", help="stop background guard")
     stop.add_argument("--state-dir", default=str(STATE_DIR))
@@ -125,16 +125,27 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def add_run_args(parser: argparse.ArgumentParser) -> None:
+def add_run_args(parser: argparse.ArgumentParser, *, include_controls: bool = False) -> None:
     parser.add_argument("--gpus", default="all", help="all, comma list, or ranges like 0-7")
     parser.add_argument(
         "--target-util",
         type=parse_ratio,
         default=0.75,
-        help="Target average GPU utilization, from 0 to 1. Legacy percent like 75 or 75%% is accepted.",
+        help="Target holder utilization, from 0 to 1. Legacy percent like 75 or 75%% is accepted.",
     )
-    parser.add_argument("--idle-util", type=int, default=50)
-    parser.add_argument("--idle-window", type=float, default=60.0)
+    parser.add_argument(
+        "--risk-util",
+        type=parse_ratio,
+        default=0.5,
+        help="Per-GPU utilization risk threshold for starting a holder, from 0 to 1.",
+    )
+    parser.add_argument(
+        "--idle-util",
+        dest="risk_util",
+        type=parse_ratio,
+        default=argparse.SUPPRESS,
+        help=argparse.SUPPRESS,
+    )
     parser.add_argument(
         "--mem",
         type=parse_mem_ratio,
@@ -146,13 +157,16 @@ def add_run_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--assist-mem", default="512MiB")
     parser.add_argument("--sample-interval", type=float, default=2.0)
     parser.add_argument("--program", default="matmul")
-    parser.add_argument("--min-duty-cycle", type=float, default=1.0)
+    parser.add_argument("--min-duty-cycle", type=float, default=0.0)
     parser.add_argument("--max-duty-cycle", type=float, default=1.0)
-    parser.add_argument("--compute-burst-seconds", type=float, default=2.0)
+    parser.add_argument("--compute-burst-seconds", type=float, default=0.2)
     parser.add_argument("--compute-burst-jitter", type=float, default=0.0)
-    parser.add_argument("--process-grace-window", type=float, default=0.0)
+    parser.add_argument("--process-grace-window", type=float, default=120.0)
     parser.add_argument("--state-dir", default=str(STATE_DIR))
     parser.add_argument("--log-interval", type=float, default=10.0)
+    if include_controls:
+        parser.add_argument("--dry-run", action="store_true", help="print one decision snapshot only")
+        parser.add_argument("--once", action="store_true", help="run one guard iteration and exit")
 
 
 def cmd_guard(args: argparse.Namespace) -> int:
@@ -162,7 +176,11 @@ def cmd_guard(args: argparse.Namespace) -> int:
         print(error, file=sys.stderr)
         return 2
     guard = Guard(config)
-    return guard.run()
+    try:
+        return guard.run()
+    except RuntimeError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
 
 
 def cmd_start(args: argparse.Namespace) -> int:
@@ -208,12 +226,13 @@ def cmd_stop(args: argparse.Namespace) -> int:
     if not is_gpu_holder_process(pid):
         print(f"refusing to stop non-holder pid={pid}", file=sys.stderr)
         return 2
-    os.kill(pid, signal.SIGTERM)
-    deadline = time.monotonic() + 5.0
+    kill_target = ProcessKillTarget(pid)
+    kill_target.terminate()
+    deadline = time.monotonic() + 10.0
     while process_exists(pid) and time.monotonic() < deadline:
         time.sleep(0.05)
     if process_exists(pid):
-        os.kill(pid, signal.SIGKILL)
+        kill_target.kill()
         print(f"sent SIGKILL to slow holder pid={pid}")
     else:
         print(f"stopped gpu-holder pid={pid}")
@@ -270,11 +289,13 @@ class Guard:
     def __init__(self, config: Config) -> None:
         self.config = config
         self.workers: dict[int, WorkerProcess] = {}
-        self.idle_since: dict[int, float] = {}
+        self.external_process_first_seen: dict[int, dict[tuple[int, ...], float]] = {}
         self.stop = False
         self.last_log = 0.0
 
     def run(self) -> int:
+        if self.config.dry_run:
+            return self.run_once(apply=False, write_status=False, log_status=False, print_status=True)
         self.config.state_dir.mkdir(parents=True, exist_ok=True)
         existing = read_pid(self.config.pid_file)
         if existing and existing != os.getpid() and process_exists(existing):
@@ -286,18 +307,46 @@ class Guard:
         log(self.config, f"started pid={os.getpid()} gpus={format_gpus(self.config.gpus)}")
         try:
             while not self.stop:
-                snapshots = read_snapshots(self.config, self.workers)
-                selected = select_gpus(snapshots, self.config.gpus)
-                decisions = decide(selected, self.config, self.idle_since)
-                self.apply(decisions)
-                payload = status_payload(selected, decisions, self.workers, self.config)
-                write_json(self.config.status_file, payload)
-                self.log_summary(payload)
+                self.run_once(apply=True, write_status=True, log_status=True, print_status=False)
+                if self.config.once:
+                    break
                 time.sleep(max(0.2, self.config.sample_interval))
         finally:
             self.stop_all_workers()
+            if not self.config.once:
+                self.config.status_file.unlink(missing_ok=True)
             self.config.pid_file.unlink(missing_ok=True)
             log(self.config, "stopped")
+        return 0
+
+    def run_once(
+        self,
+        *,
+        apply: bool,
+        write_status: bool,
+        log_status: bool,
+        print_status: bool,
+    ) -> int:
+        snapshots = read_snapshots(self.config, self.workers)
+        selected = select_gpus(snapshots, self.config.gpus)
+        now = time.monotonic()
+        if apply:
+            self.update_external_process_first_seen(selected, now=now)
+        decisions = decide(
+            selected,
+            self.config,
+            external_process_first_seen=self.external_process_first_seen,
+            now=now,
+        )
+        if apply:
+            self.apply(decisions)
+        payload = status_payload(selected, decisions, self.workers, self.config)
+        if write_status:
+            write_json(self.config.status_file, payload)
+        if log_status:
+            self.log_summary(payload)
+        if print_status:
+            print(format_status(payload))
         return 0
 
     def apply(self, decisions: list[Decision]) -> None:
@@ -309,6 +358,27 @@ class Guard:
                 self.start_worker(decision)
             else:
                 self.stop_worker(decision.gpu_index)
+
+    def update_external_process_first_seen(
+        self,
+        snapshots: list[GpuSnapshot],
+        *,
+        now: float,
+    ) -> None:
+        visible_gpu_indices = {gpu.index for gpu in snapshots}
+        for gpu in snapshots:
+            external = [process for process in gpu.processes if not process.is_holder]
+            if not external:
+                self.external_process_first_seen.pop(gpu.index, None)
+                continue
+            signature = process_signature(external)
+            gpu_seen = self.external_process_first_seen.setdefault(gpu.index, {})
+            if signature not in gpu_seen:
+                gpu_seen.clear()
+                gpu_seen[signature] = now
+        for gpu_index in list(self.external_process_first_seen):
+            if gpu_index not in visible_gpu_indices:
+                self.external_process_first_seen.pop(gpu_index, None)
 
     def start_worker(self, decision: Decision) -> None:
         worker = WorkerProcess(
@@ -359,34 +429,46 @@ class Guard:
         self.stop = True
 
 
-def decide(snapshots: list[GpuSnapshot], config: Config, idle_since: dict[int, float]) -> list[Decision]:
-    now = time.time()
-    machine_avg = sum(g.utilization for g in snapshots) / max(1, len(snapshots))
-    target = config.target_util * 100
-    release_target = min(100.0, (config.target_util + TARGET_RELEASE_MARGIN) * 100)
+def decide(
+    snapshots: list[GpuSnapshot],
+    config: Config,
+    *,
+    external_process_first_seen: dict[int, dict[tuple[int, ...], float]] | None = None,
+    now: float | None = None,
+) -> list[Decision]:
+    risk = config.risk_util * 100
     decisions: list[Decision] = []
     busy_threshold = parse_bytes(config.busy_process_mem_threshold)
+    external_process_first_seen = external_process_first_seen or {}
+    now = time.monotonic() if now is None else float(now)
     for gpu in snapshots:
         holder_running = any(process.is_holder for process in gpu.processes)
-        if gpu.utilization < config.idle_util:
-            idle_since.setdefault(gpu.index, now)
+        external_processes = [process for process in gpu.processes if not process.is_holder]
+        external_busy = any(process.used_memory >= busy_threshold for process in external_processes)
+        external_stale = external_processes and all(is_stale_process(process) for process in external_processes)
+        if external_processes:
+            external_signature = process_signature(external_processes)
+            first_seen = external_process_first_seen.get(gpu.index, {}).get(external_signature, now)
+            in_grace = now - first_seen < max(0.0, config.process_grace_window)
+            if external_busy and in_grace:
+                decisions.append(make_release(gpu, "busy_process_grace"))
+                continue
+            if external_busy and gpu.utilization < risk:
+                reason = "busy_process_idle" if external_busy else "external_process_idle"
+                decisions.append(make_hold(gpu, config, reason=reason, assist=True))
+                continue
+            if external_stale and not holder_running and gpu.utilization < risk:
+                decisions.append(make_hold(gpu, config, reason="external_process_idle", assist=True))
+                continue
+            reason = "busy_process" if external_busy else "external_process"
+            decisions.append(make_release(gpu, reason))
+            continue
+        if gpu.utilization < risk:
+            decisions.append(make_hold(gpu, config, reason="below_risk", assist=False))
+        elif holder_running:
+            decisions.append(make_hold(gpu, config, reason="holder_running", assist=False))
         else:
-            idle_since.pop(gpu.index, None)
-        low_for_long = now - idle_since.get(gpu.index, now) >= config.idle_window
-        external_busy = any(
-            (not process.is_holder) and process.used_memory >= busy_threshold
-            for process in gpu.processes
-        )
-        if low_for_long:
-            decisions.append(make_hold(gpu, config, reason="low_util", assist=external_busy))
-        elif external_busy:
-            decisions.append(make_release(gpu, "busy_process"))
-        elif machine_avg < target:
-            decisions.append(make_hold(gpu, config, reason="below_target", assist=False))
-        elif holder_running and machine_avg < release_target:
-            decisions.append(make_hold(gpu, config, reason="target_margin", assist=False))
-        else:
-            decisions.append(make_release(gpu, "target_met"))
+            decisions.append(make_release(gpu, "risk_clear"))
     return decisions
 
 
@@ -398,7 +480,7 @@ def make_hold(gpu: GpuSnapshot, config: Config, *, reason: str, assist: bool) ->
         if assist
         else resolve_memory_ratio(config.mem, total=gpu.memory_total, free=gpu.memory_free, reserve=reserve)
     )
-    duty = max(config.min_duty_cycle, min(config.max_duty_cycle, 1.0))
+    duty = max(config.min_duty_cycle, min(config.max_duty_cycle, config.target_util))
     return Decision(
         gpu_index=gpu.index,
         action="hold",
@@ -411,6 +493,14 @@ def make_hold(gpu: GpuSnapshot, config: Config, *, reason: str, assist: bool) ->
 
 def make_release(gpu: GpuSnapshot, reason: str) -> Decision:
     return Decision(gpu_index=gpu.index, action="release", reason=reason, memory_bytes=0, duty_cycle=0, hold_mode="-")
+
+
+def is_stale_process(process: GpuProcess) -> bool:
+    return process.name.strip() == "[Not Found]"
+
+
+def process_signature(processes: list[GpuProcess]) -> tuple[int, ...]:
+    return tuple(sorted(process.pid for process in processes))
 
 
 def read_snapshots(config: Config, workers: dict[int, WorkerProcess]) -> list[GpuSnapshot]:
@@ -496,9 +586,11 @@ def status_payload(
         "config": {
             "gpus": list(config.gpus) if config.gpus != "all" else "all",
             "target_util": config.target_util,
+            "risk_util": config.risk_util,
             "mem": config.mem,
             "program": config.program,
             "sample_interval": config.sample_interval,
+            "process_grace_window": config.process_grace_window,
         },
         "machine": {
             "gpu_count": len(snapshots),
@@ -612,9 +704,14 @@ def validate_config(config: Config) -> str | None:
         return "--sample-interval must be positive"
     if config.log_interval < 0:
         return "--log-interval must be non-negative"
+    if config.process_grace_window < 0:
+        return "--process-grace-window must be non-negative"
+    if config.compute_burst_seconds <= 0:
+        return "--compute-burst-seconds must be positive"
     try:
         parse_gpus(format_gpus(config.gpus))
         parse_ratio(config.target_util)
+        parse_ratio(config.risk_util)
         parse_ratio(config.mem)
         parse_bytes(config.reserve)
         parse_bytes(config.busy_process_mem_threshold)
@@ -631,8 +728,7 @@ def config_from_args(args: argparse.Namespace) -> Config:
     return Config(
         gpus=parse_gpus(args.gpus),
         target_util=args.target_util,
-        idle_util=args.idle_util,
-        idle_window=args.idle_window,
+        risk_util=args.risk_util,
         mem=args.mem,
         reserve=args.reserve,
         busy_process_mem_threshold=args.busy_process_mem_threshold,
@@ -646,6 +742,8 @@ def config_from_args(args: argparse.Namespace) -> Config:
         process_grace_window=args.process_grace_window,
         state_dir=Path(args.state_dir).expanduser(),
         log_interval=args.log_interval,
+        dry_run=getattr(args, "dry_run", False),
+        once=getattr(args, "once", False),
     )
 
 
@@ -653,8 +751,7 @@ def child_args(config: Config) -> list[str]:
     return [
         "--gpus", format_gpus(config.gpus),
         "--target-util", format_ratio(config.target_util),
-        "--idle-util", str(config.idle_util),
-        "--idle-window", str(config.idle_window),
+        "--risk-util", format_ratio(config.risk_util),
         "--mem", format_ratio(config.mem),
         "--reserve", config.reserve,
         "--busy-process-mem-threshold", config.busy_process_mem_threshold,
@@ -791,6 +888,28 @@ def process_exists(pid: int) -> bool:
     except OSError:
         return False
     return len(fields) < 3 or fields[2] != "Z"
+
+
+class ProcessKillTarget:
+    def __init__(self, pid: int) -> None:
+        self.pid = pid
+        self.use_group = False
+        try:
+            self.use_group = os.getsid(pid) == pid
+        except OSError:
+            pass
+
+    def terminate(self) -> None:
+        self._send(signal.SIGTERM)
+
+    def kill(self) -> None:
+        self._send(signal.SIGKILL)
+
+    def _send(self, signum: int) -> None:
+        if self.use_group:
+            os.killpg(self.pid, signum)
+        else:
+            os.kill(self.pid, signum)
 
 
 def is_gpu_holder_process(pid: int) -> bool:

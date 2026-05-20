@@ -6,9 +6,12 @@ import random
 import signal
 import time
 from typing import Any
+from typing import Callable
 
 
 BASE_PROGRAMS = ("matmul", "conv", "fft", "elementwise")
+MATMUL_SIZE = 8192
+_PROGRAM_CACHE: dict[tuple[str, str], tuple[object, ...]] = {}
 
 
 class WorkerStartError(RuntimeError):
@@ -165,10 +168,7 @@ def _worker_main(
 
     while True:
         current_burst_seconds = _jittered_burst_seconds(base_burst_seconds, jitter, rng=rng)
-        sleep_seconds = _sleep_seconds_for_duty(
-            burst_seconds=current_burst_seconds,
-            duty=duty,
-        )
+        compute_seconds = current_burst_seconds
         if mode != "memory-only":
             selected = _next_program(
                 programs,
@@ -180,6 +180,11 @@ def _worker_main(
             started = time.monotonic()
             while time.monotonic() - started < current_burst_seconds:
                 _run_program(torch=torch, name=selected, gpu_index=gpu_index)
+            compute_seconds = time.monotonic() - started
+        sleep_seconds = _sleep_seconds_for_duty(
+            burst_seconds=compute_seconds,
+            duty=duty,
+        )
         if sleep_seconds > 0:
             time.sleep(sleep_seconds)
         if holder is not None and len(holder) == -1:
@@ -261,9 +266,16 @@ def _normalize_hold_mode(mode: str) -> str:
 def _run_program(*, torch: object, name: str, gpu_index: int) -> None:
     device = f"cuda:{gpu_index}"
     if name == "matmul":
-        a = torch.randn((2048, 2048), dtype=torch.float16, device=device)
-        b = torch.randn((2048, 2048), dtype=torch.float16, device=device)
-        torch.mm(a, b)
+        a, b, out = _cached_program_tensors(
+            torch=torch,
+            key=(device, name),
+            factory=lambda: (
+                torch.randn((MATMUL_SIZE, MATMUL_SIZE), dtype=torch.float16, device=device),
+                torch.randn((MATMUL_SIZE, MATMUL_SIZE), dtype=torch.float16, device=device),
+                torch.empty((MATMUL_SIZE, MATMUL_SIZE), dtype=torch.float16, device=device),
+            ),
+        )
+        torch.mm(a, b, out=out)
     elif name == "conv":
         x = torch.randn((16, 32, 128, 128), dtype=torch.float16, device=device)
         weight = torch.randn((32, 32, 3, 3), dtype=torch.float16, device=device)
@@ -278,6 +290,20 @@ def _run_program(*, torch: object, name: str, gpu_index: int) -> None:
     else:
         raise ValueError(f"unknown program: {name!r}")
     torch.cuda.synchronize(device)
+
+
+def _cached_program_tensors(
+    *,
+    torch: object,
+    key: tuple[str, str],
+    factory: Callable[[], tuple[object, ...]],
+) -> tuple[object, ...]:
+    del torch
+    cached = _PROGRAM_CACHE.get(key)
+    if cached is None:
+        cached = factory()
+        _PROGRAM_CACHE[key] = cached
+    return cached
 
 
 def _put_ready_message(queue: mp.Queue[dict[str, Any]], message: dict[str, Any]) -> None:

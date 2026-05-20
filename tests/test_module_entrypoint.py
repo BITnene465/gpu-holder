@@ -37,5 +37,8 @@ def test_package_module_entrypoint_exposes_guard_help() -> None:
 
     assert result.returncode == 0
     assert "--target-util" in result.stdout
+    assert "--risk-util" in result.stdout
     assert "--mem" in result.stdout
+    assert "--dry-run" in result.stdout
+    assert "--once" in result.stdout
     assert "from 0 to 1" in result.stdout

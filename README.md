@@ -1,6 +1,6 @@
 # gpu-holder
 
-`gpu-holder` 是一个很小的 NVIDIA GPU 占卡工具：机器空闲时启动自己的 CUDA worker，把平均利用率维持到目标线附近；真实训练、推理或服务进程出现时释放自己的 worker。
+`gpu-holder` 是一个很小的 NVIDIA GPU 占卡工具：机器空闲时按单卡启动 CUDA worker，把每张卡的利用率维持到目标强度附近；真实训练、推理或服务进程出现时释放或降级为 assist。
 
 它的安全边界很窄：
 
@@ -40,36 +40,53 @@ python -m pip install -e ".[dev]"    # 测试、lint、构建工具
 前台指定 8 张卡运行：
 
 ```bash
-gpu-holder guard --gpus 0-7 --mem 0.2 --target-util 0.75
+gpu-holder guard --gpus 0-7 --risk-util 0.5 --target-util 0.75 --mem 0.2
 ```
 
 后台运行：
 
 ```bash
-gpu-holder start --gpus 0-7 --mem 0.2 --target-util 0.75
+gpu-holder start --gpus 0-7 --risk-util 0.5 --target-util 0.75 --mem 0.2
 gpu-holder status
 gpu-holder dashboard
 gpu-holder stop
 ```
 
-`--mem` 和 `--target-util` 都使用 `0~1` 浮点数：
+只看本轮决策，不启动 worker、不写状态：
+
+```bash
+gpu-holder guard --gpus 0-7 --risk-util 0.5 --target-util 0.75 --mem 0.2 --dry-run
+```
+
+跑一轮真实 guard 循环后退出，适合 smoke check：
+
+```bash
+gpu-holder guard --gpus 0-7 --risk-util 0.5 --target-util 0.75 --mem 0.2 --once
+```
+
+`--risk-util`、`--target-util` 和 `--mem` 都使用 `0~1` 浮点数：
 
 - `--gpus 0-7` 表示使用 0 到 7 号卡；也支持 `all` 和 `0-3,6,7`。
+- `--risk-util 0.5` 表示单卡利用率低于 50% 时开始占卡。
+- `--target-util 0.75` 表示每张卡上的 holder 目标利用率，worker 会用短周期矩阵乘法 duty 控制接近该目标。
 - `--mem 0.2` 表示最多使用单卡显存的 20%。
-- `--target-util 0.75` 表示目标整机平均利用率 75%。
 - 兼容旧写法：`20%`、`75%`、`75` 仍会被解析成 `0.2`、`0.75`、`0.75`。
 
 默认策略：
 
-- 目标整机平均利用率：`0.75`
-- 释放缓冲：目标线以上 `0.03`
+- 单卡风险阈值：`0.5`
+- 单卡 holder 目标利用率：`0.75`
+- 默认最小 duty：`0.0`
+- 默认计算周期：`0.2s`，用于减少 `nvidia-smi` 采样抖动
 - 默认显存占用：`0.2`
 - 显存预留：`2GiB`
 - 大进程让道阈值：`10GiB`
-- 低利用率阈值：`50%`
+- 大进程启动观察窗口：`120s`
 - 温度释放阈值：`85C`
 
-释放缓冲的作用是避免刚到目标线就释放 worker，导致最终平均利用率总是略低于 `--target-util`。已有 holder worker 时，工具会等平均利用率超过 `target + 0.03` 后再释放。
+占卡启动依据是单卡利用率，不是整机平均利用率。某张卡低于 `--risk-util` 时会启动 holder；holder 启动后不会因为达到 `--target-util` 自动释放，避免 start/stop 抖动。
+
+外部 CUDA 进程优先级最高。占用显存超过 `--busy-process-mem-threshold` 的训练进程出现在某张卡上时，`gpu-holder` 会先释放该卡并观察 `--process-grace-window` 秒，默认 120 秒；窗口结束后，如果这张卡仍低于 `--risk-util`，才会用 assist 模式补利用率。训练进程消失后，如果这张卡低于 `--risk-util`，下一轮调度会立刻重新占卡。
 
 ## 命令
 

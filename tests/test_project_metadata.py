@@ -49,7 +49,7 @@ def test_parser_only_exposes_current_commands() -> None:
 def test_readme_does_not_document_deleted_features() -> None:
     content = (ROOT / "README.md").read_text(encoding="utf-8").lower()
 
-    assert "gpu-holder guard --gpus 0-7 --mem 0.2 --target-util 0.75" in content
+    assert "gpu-holder guard --gpus 0-7 --risk-util 0.5 --target-util 0.75 --mem 0.2" in content
     for deleted_feature in [
         "plan --fake",
         "preflight",
