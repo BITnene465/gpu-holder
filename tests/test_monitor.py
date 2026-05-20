@@ -138,3 +138,32 @@ def test_nvidia_smi_fallback_reads_snapshots_and_processes(monkeypatch) -> None:
     assert process.used_memory_bytes == 4096 * 1024**2
     assert process.name == "proc-2222"
     assert process.is_holder is True
+
+
+def test_nvidia_smi_fallback_marks_hidden_holder_by_gpu_memory(monkeypatch) -> None:
+    monkeypatch.setitem(sys.modules, "pynvml", None)
+    monkeypatch.setattr(monitor_mod, "_process_name", lambda pid: "")
+
+    def fake_run_nvidia_smi(args: list[str]) -> str:
+        query = args[0]
+        if query.startswith("--query-gpu="):
+            return "7, GPU-7777, Fake GPU 7, 81920, 17084, 67, 47"
+        if query.startswith("--query-compute-apps="):
+            return "GPU-7777, 513747, 17084"
+        raise AssertionError(args)
+
+    monkeypatch.setattr(monitor_mod, "_run_nvidia_smi", fake_run_nvidia_smi)
+
+    monitor = NvmlMonitor(holder_pids={391313})
+    try:
+        monitor.update_holder_pids(
+            {391313},
+            holder_memory_by_gpu={7: 16 * 1024**3},
+        )
+        snapshot = monitor.snapshots((7,))[0]
+    finally:
+        monitor.close()
+
+    assert snapshot.processes[0].pid == 513747
+    assert snapshot.processes[0].is_holder is True
+    assert snapshot.non_holder_processes() == ()

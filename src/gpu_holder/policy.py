@@ -153,7 +153,7 @@ def decide_for_gpu(
             history_average=history_average,
         )
 
-    if machine_needs_help and snapshot.utilization < config.target_util:
+    if machine_needs_help:
         memory_bytes = _memory_for_mode(
             mode=config.hold_mode,
             snapshot=snapshot,
@@ -171,7 +171,11 @@ def decide_for_gpu(
         return HolderDecision(
             gpu_index=snapshot.index,
             action=DecisionAction.HOLD,
-            reason="below_target",
+            reason=(
+                "below_policy_target"
+                if snapshot.utilization >= config.target_util
+                else "below_target"
+            ),
             memory_bytes=memory_bytes,
             duty_cycle=_duty_for_mode(
                 mode=config.hold_mode,

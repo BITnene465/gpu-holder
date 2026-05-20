@@ -135,6 +135,16 @@ while it remains in alpha.
 - Daemon `start` no longer overwrites a pidfile that appears after spawning its
   child process; on conflict it terminates only that just-created child.
 
+### Fixed
+
+- `nvidia-smi` fallback monitoring now recognizes hidden namespace worker PIDs
+  as owned holders when their GPU index and memory footprint match the
+  controller's worker plan, avoiding false `process_grace` releases.
+- Fleet policy now keeps holders running while the rolling policy window is
+  below target, even if instantaneous utilization temporarily exceeds the
+  target. This prevents high-load matmul holders from oscillating between
+  active and idle states.
+
 ## [0.1.0] - Unreleased
 
 - Initial alpha release target.

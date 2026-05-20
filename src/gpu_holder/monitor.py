@@ -19,6 +19,7 @@ class NvmlMonitor:
         self._nvml = pynvml
         self._fallback = None
         self._holder_pids = holder_pids or set()
+        self._holder_memory_by_gpu: dict[int, int] = {}
         self._nvml.nvmlInit()
 
     def close(self) -> None:
@@ -39,11 +40,16 @@ class NvmlMonitor:
         now = time.time()
         return [self._snapshot(index, now=now) for index in selected]
 
-    def update_holder_pids(self, pids: set[int]) -> None:
+    def update_holder_pids(
+        self,
+        pids: set[int],
+        holder_memory_by_gpu: dict[int, int] | None = None,
+    ) -> None:
         if self._fallback is not None:
-            self._fallback.update_holder_pids(pids)
+            self._fallback.update_holder_pids(pids, holder_memory_by_gpu=holder_memory_by_gpu)
             return
         self._holder_pids = set(pids)
+        self._holder_memory_by_gpu = dict(holder_memory_by_gpu or {})
 
     def _snapshot(self, index: int, *, now: float) -> GpuSnapshot:
         handle = self._nvml.nvmlDeviceGetHandleByIndex(int(index))
@@ -108,6 +114,7 @@ class NvmlMonitor:
 class NvidiaSmiMonitor:
     def __init__(self, holder_pids: set[int] | None = None) -> None:
         self._holder_pids = holder_pids or set()
+        self._holder_memory_by_gpu: dict[int, int] = {}
         self._gpu_rows()
 
     def close(self) -> None:
@@ -118,10 +125,16 @@ class NvidiaSmiMonitor:
 
     def snapshots(self, indices: tuple[int, ...] | None = None) -> list[GpuSnapshot]:
         selected = set(indices) if indices is not None else None
-        process_map = self._processes_by_uuid()
+        gpu_rows = self._gpu_rows()
+        index_by_uuid = {
+            row["uuid"]: index
+            for row in gpu_rows
+            if (index := _parse_int(row["index"])) is not None
+        }
+        process_map = self._processes_by_uuid(index_by_uuid=index_by_uuid)
         now = time.time()
         snapshots = []
-        for row in self._gpu_rows():
+        for row in gpu_rows:
             index = _parse_int(row["index"])
             if index is None:
                 continue
@@ -142,8 +155,13 @@ class NvidiaSmiMonitor:
             )
         return snapshots
 
-    def update_holder_pids(self, pids: set[int]) -> None:
+    def update_holder_pids(
+        self,
+        pids: set[int],
+        holder_memory_by_gpu: dict[int, int] | None = None,
+    ) -> None:
         self._holder_pids = set(pids)
+        self._holder_memory_by_gpu = dict(holder_memory_by_gpu or {})
 
     def _gpu_rows(self) -> list[dict[str, str]]:
         output = _run_nvidia_smi(
@@ -169,7 +187,11 @@ class NvidiaSmiMonitor:
             )
         return rows
 
-    def _processes_by_uuid(self) -> dict[str, tuple[GpuProcess, ...]]:
+    def _processes_by_uuid(
+        self,
+        *,
+        index_by_uuid: dict[str, int],
+    ) -> dict[str, tuple[GpuProcess, ...]]:
         try:
             output = _run_nvidia_smi(
                 [
@@ -187,17 +209,28 @@ class NvidiaSmiMonitor:
             pid = _parse_int(pid_text)
             if pid is None:
                 continue
+            gpu_index = index_by_uuid.get(uuid)
             existing = processes_by_uuid.setdefault(uuid, {})
             previous = existing.get(pid)
             used = _mib_to_bytes(used_text)
+            process_name = previous.name if previous is not None else _process_name(pid)
             existing[pid] = GpuProcess(
                 pid=pid,
                 used_memory_bytes=max(
                     used,
                     previous.used_memory_bytes if previous is not None else 0,
                 ),
-                name=previous.name if previous is not None else _process_name(pid),
-                is_holder=pid in self._holder_pids,
+                name=process_name,
+                is_holder=(
+                    pid in self._holder_pids
+                    or _matches_hidden_holder_process(
+                        gpu_index=gpu_index,
+                        pid=pid,
+                        used_memory_bytes=used,
+                        process_name=process_name,
+                        holder_memory_by_gpu=self._holder_memory_by_gpu,
+                    )
+                ),
             )
         return {
             uuid: tuple(processes[pid] for pid in sorted(processes))
@@ -218,6 +251,28 @@ def _process_used_memory(raw: object) -> int:
         return max(0, int(getattr(raw, "usedGpuMemory", 0) or 0))
     except (TypeError, ValueError, OverflowError):
         return 0
+
+
+def _matches_hidden_holder_process(
+    *,
+    gpu_index: int | None,
+    pid: int,
+    used_memory_bytes: int,
+    process_name: str,
+    holder_memory_by_gpu: dict[int, int],
+) -> bool:
+    if gpu_index is None or gpu_index not in holder_memory_by_gpu:
+        return False
+    if pid in holder_memory_by_gpu:
+        return False
+    if process_name:
+        return False
+    expected = max(0, int(holder_memory_by_gpu[gpu_index]))
+    if expected <= 0:
+        return False
+    lower_bound = max(0, expected - 1024**3)
+    upper_bound = expected + 2 * 1024**3
+    return lower_bound <= int(used_memory_bytes) <= upper_bound
 
 
 def _run_nvidia_smi(args: list[str]) -> str:

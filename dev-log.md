@@ -74,3 +74,26 @@ lessons that should not live only in chat history.
 - Add a short demo GIF or terminal screenshot for the dashboard.
 - Run a supervised full `guard` smoke after confirming the intended GPU is
   available and `nvidia-smi` fallback behavior is acceptable for that host.
+
+### High-Load Matmul Fix
+
+- Symptom: users observed GPU utilization frequently dropping to `0%` even
+  while gpu-holder workers existed.
+- Root causes:
+  - On this host, `nvidia-smi` reported worker GPU PIDs from another namespace,
+    so fallback monitoring treated owned workers as new external processes and
+    triggered `process_grace` releases.
+  - With `target_util = 75`, sustained matmul quickly pushed instantaneous
+    utilization above target, and the controller released holders even though
+    the rolling policy window had not yet stabilized.
+- Fixes:
+  - The `nvidia-smi` fallback now marks hidden worker PIDs as holders when GPU
+    index and memory footprint match the controller's owned worker plan.
+  - The policy continues holding while the rolling policy window is below the
+    configured target.
+  - For forced high-load occupancy, run matmul with `target_util = 95`,
+    `min_duty_cycle = max_duty_cycle = 1`, and `process_grace_window = 0`.
+- Verification:
+  - Restarted the guard with matmul-only full-duty parameters.
+  - Observed 8 GPUs at roughly `85-87%` utilization and about `16.5GiB` memory
+    each after the restart.

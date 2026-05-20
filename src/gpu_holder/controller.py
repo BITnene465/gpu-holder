@@ -44,7 +44,10 @@ class GuardController:
             indices = _resolve_gpu_indices(self.config.gpus, gpu_count=monitor.gpu_count())
             while not self._stop:
                 self.reap_workers()
-                monitor.update_holder_pids(self._holder_pids())
+                monitor.update_holder_pids(
+                    self._holder_pids(),
+                    holder_memory_by_gpu=self._holder_memory_by_gpu(),
+                )
                 snapshots = monitor.snapshots(indices)
                 decisions = self.decide(snapshots)
                 self.record_decisions(decisions)
@@ -232,6 +235,13 @@ class GuardController:
             worker.pid
             for worker in self._workers.values()
             if worker.pid is not None and worker.is_alive()
+        }
+
+    def _holder_memory_by_gpu(self) -> dict[int, int]:
+        return {
+            gpu_index: int(getattr(worker, "memory_bytes", 0))
+            for gpu_index, worker in self._workers.items()
+            if worker.is_alive()
         }
 
     def _worker_statuses(self) -> dict[int, dict[str, object]]:

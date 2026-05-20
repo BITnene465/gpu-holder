@@ -319,8 +319,8 @@ def test_fleet_uses_machine_policy_average_to_decide_if_help_is_needed() -> None
     )
 
     assert average_utilization(snapshots) >= 75
-    assert decisions[0].action == DecisionAction.STANDBY
-    assert decisions[0].reason == "target_met"
+    assert decisions[0].action == DecisionAction.HOLD
+    assert decisions[0].reason == "below_policy_target"
     assert decisions[0].machine_average == 85
     assert decisions[0].machine_policy_average == 60.0
 

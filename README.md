@@ -139,6 +139,21 @@ Use more memory on idle GPUs:
 gpu-holder guard --mem 70%
 ```
 
+Force high sustained matmul utilization:
+
+```bash
+gpu-holder start \
+  --gpus 0,1,2,3,4,5,6,7 \
+  --target-util 95 \
+  --mem 20% \
+  --program matmul \
+  --min-duty-cycle 1 \
+  --max-duty-cycle 1 \
+  --compute-burst-seconds 2 \
+  --compute-burst-jitter 0 \
+  --process-grace-window 0
+```
+
 Run a terminal dashboard:
 
 ```bash
