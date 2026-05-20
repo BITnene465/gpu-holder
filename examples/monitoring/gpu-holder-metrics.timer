@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh gpu-holder node_exporter metrics
+Documentation=https://github.com/nene/gpu-holder
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=15s
+AccuracySec=5s
+Unit=gpu-holder-metrics.service
+
+[Install]
+WantedBy=timers.target

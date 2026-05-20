@@ -1,0 +1,47 @@
+name: Feature request
+description: Propose a policy, TUI, worker, diagnostics, or packaging improvement.
+title: "[feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What workflow or operational problem should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the behavior, CLI/TUI surface, and expected defaults.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Policy / scheduler
+        - Worker program / hold mode
+        - TUI dashboard
+        - CLI / daemon
+        - Diagnostics / reporting
+        - Packaging / release
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety considerations
+      description: |
+        How should this preserve the invariant that external GPU processes are
+        read-only scheduling signals and never control targets?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any simpler workaround or rejected design?

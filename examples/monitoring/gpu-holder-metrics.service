@@ -1,0 +1,8 @@
+[Unit]
+Description=Export gpu-holder metrics for node_exporter textfile collector
+Documentation=https://github.com/nene/gpu-holder
+
+[Service]
+Type=oneshot
+ExecStartPre=/usr/bin/mkdir -p %h/.gpu-holder/node_exporter
+ExecStart=gpu-holder metrics --output %h/.gpu-holder/node_exporter/gpu-holder.prom

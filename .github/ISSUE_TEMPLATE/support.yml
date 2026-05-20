@@ -1,0 +1,41 @@
+name: Runtime support
+description: Ask for help interpreting status, events, doctor output, or policy decisions.
+title: "[support]: "
+labels: ["support"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For support requests, prefer read-only commands first:
+
+        ```bash
+        gpu-holder doctor --json
+        gpu-holder status --json
+        gpu-holder events --limit 50 --json
+        gpu-holder report --json
+        ```
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What are you trying to understand or fix?
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Python version, GPU model, driver/CUDA version, install method.
+  - type: textarea
+    id: outputs
+    attributes:
+      label: Read-only outputs
+      description: Paste relevant doctor/status/events/report output.
+      render: json
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety
+      options:
+        - label: I understand `gpu-holder` should only stop workers it started itself, not external GPU jobs.
+          required: true

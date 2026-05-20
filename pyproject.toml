@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gpu-holder"
+version = "0.1.0"
+description = "A polite GPU guard that keeps utilization high while yielding to real workloads."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+  { name = "gpu-holder contributors" },
+]
+keywords = ["gpu", "cuda", "nvidia", "monitoring", "utilization", "cli", "tui"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: System :: Monitoring",
+]
+dependencies = []
+
+[project.optional-dependencies]
+cuda = [
+  "nvidia-ml-py>=12.0.0",
+  "torch>=2.0.0",
+]
+dev = [
+  "build>=1.0.0",
+  "pytest>=8.0.0",
+  "ruff>=0.9.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/nene/gpu-holder"
+Repository = "https://github.com/nene/gpu-holder"
+Issues = "https://github.com/nene/gpu-holder/issues"
+
+[project.scripts]
+gpu-holder = "gpu_holder.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+pythonpath = ["src"]

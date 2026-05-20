@@ -1,0 +1,62 @@
+name: Bug report
+description: Report incorrect scheduling, CLI, TUI, daemon, or diagnostics behavior.
+title: "[bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. `gpu-holder` must never kill or control
+        external GPU processes; include any evidence if you suspect that safety
+        invariant was violated.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened?
+    validations:
+      required: true
+  - type: textarea
+    id: commands
+    attributes:
+      label: Commands run
+      description: Paste the exact command(s), redacting only secrets.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Paste `gpu-holder doctor --json` and relevant `gpu-holder report --json` excerpts.
+      render: json
+  - type: textarea
+    id: status
+    attributes:
+      label: Status and events
+      description: Paste relevant `gpu-holder status --json` and filtered `gpu-holder events --json` output.
+      render: json
+  - type: dropdown
+    id: real_gpu
+    attributes:
+      label: Did this run real CUDA holder workers?
+      options:
+        - "No"
+        - "Yes, on an idle or explicitly owned GPU"
+        - "Yes, on a shared/busy GPU"
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety confirmation
+      options:
+        - label: I did not intentionally ask `gpu-holder` to kill or control external GPU processes.
+          required: true
