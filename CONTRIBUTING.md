@@ -55,6 +55,7 @@ Use manual GPU checks only when a change affects real CUDA behavior:
 ```bash
 gpu-holder doctor --json
 gpu-holder doctor --backend driver --json
+gpu-holder guard --gpus 0 --risk-util 0.6 --target-util 0.9 --mem 0 --backend driver --once
 gpu-holder guard --gpus 0 --risk-util 0.6 --target-util 0.9 --mem 0.05 --backend torch --once
 ```
 

@@ -98,7 +98,9 @@ def test_repository_has_github_ready_safety_docs() -> None:
     assert "policy.py" in contributing
     assert "driver_backend.py" in contributing
     assert "telemetry.py" in contributing
+    assert "gpu-holder guard --gpus 0 --risk-util 0.6 --target-util 0.9 --mem 0 --backend driver --once" in contributing
     assert "ROADMAP.md" in readme
+    assert "avoid PyTorch and use the experimental Driver API backend" in readme
     assert "Near-Term Priorities" in roadmap
     assert "Non-Goals" in roadmap
     assert "Compatibility Reality" in roadmap

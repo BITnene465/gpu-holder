@@ -29,16 +29,24 @@ cd gpu-holder
 python -m pip install -e .
 ```
 
-If your environment already has a CUDA-enabled PyTorch, the worker can use it directly. Otherwise install the optional worker dependency:
+If your environment already has a CUDA-enabled PyTorch, the default worker can use it directly.
+Otherwise install the optional worker dependency:
 
 ```bash
 python -m pip install -e ".[torch]"
 ```
 
-Run a foreground guard on 8 GPUs:
+Run a foreground guard on 8 GPUs with the PyTorch backend:
 
 ```bash
 gpu-holder guard --gpus 0-7 --risk-util 0.6 --target-util 0.9 --mem 0.05 --backend torch
+```
+
+Or avoid PyTorch and use the experimental Driver API backend:
+
+```bash
+gpu-holder doctor --backend driver
+gpu-holder guard --gpus 0-7 --risk-util 0.6 --target-util 0.9 --mem 0.05 --backend driver
 ```
 
 Stop a foreground guard with `Ctrl+C`.
