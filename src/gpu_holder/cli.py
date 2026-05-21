@@ -12,11 +12,33 @@ import threading
 import time
 
 from . import __version__
+from .models import Decision, GpuProcess, GpuSnapshot
+from .policy import decide
+from .policy import make_hold
+from .policy import make_release
+from .policy import parse_bytes
+from .policy import process_signature
+from .policy import resolve_memory_ratio
+from .policy import resolve_memory_spec
 from .worker import WorkerProcess
 
 
 STATE_DIR = Path.home() / ".gpu-holder"
 BASE_PROGRAMS = {"matmul", "conv", "fft", "elementwise", "mixed", "random"}
+
+__all__ = [
+    "Config",
+    "Decision",
+    "GpuProcess",
+    "GpuSnapshot",
+    "decide",
+    "make_hold",
+    "make_release",
+    "parse_bytes",
+    "process_signature",
+    "resolve_memory_ratio",
+    "resolve_memory_spec",
+]
 
 
 @dataclass(frozen=True)
@@ -51,37 +73,6 @@ class Config:
     @property
     def log_file(self) -> Path:
         return self.state_dir / "gpu-holder.log"
-
-
-@dataclass
-class GpuProcess:
-    pid: int
-    used_memory: int
-    name: str
-    is_holder: bool = False
-
-
-@dataclass
-class GpuSnapshot:
-    index: int
-    uuid: str
-    name: str
-    utilization: int
-    memory_total: int
-    memory_used: int
-    memory_free: int
-    temperature: int | None
-    processes: list[GpuProcess]
-
-
-@dataclass
-class Decision:
-    gpu_index: int
-    action: str
-    reason: str
-    memory_bytes: int
-    duty_cycle: float
-    hold_mode: str
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -429,80 +420,6 @@ class Guard:
         self.stop = True
 
 
-def decide(
-    snapshots: list[GpuSnapshot],
-    config: Config,
-    *,
-    external_process_first_seen: dict[int, dict[tuple[int, ...], float]] | None = None,
-    now: float | None = None,
-) -> list[Decision]:
-    risk = config.risk_util * 100
-    decisions: list[Decision] = []
-    busy_threshold = parse_bytes(config.busy_process_mem_threshold)
-    external_process_first_seen = external_process_first_seen or {}
-    now = time.monotonic() if now is None else float(now)
-    for gpu in snapshots:
-        holder_running = any(process.is_holder for process in gpu.processes)
-        external_processes = [process for process in gpu.processes if not process.is_holder]
-        external_busy = any(process.used_memory >= busy_threshold for process in external_processes)
-        external_stale = external_processes and all(is_stale_process(process) for process in external_processes)
-        if external_processes:
-            external_signature = process_signature(external_processes)
-            first_seen = external_process_first_seen.get(gpu.index, {}).get(external_signature, now)
-            in_grace = now - first_seen < max(0.0, config.process_grace_window)
-            if external_busy and in_grace:
-                decisions.append(make_release(gpu, "busy_process_grace"))
-                continue
-            if external_busy and gpu.utilization < risk:
-                reason = "busy_process_idle" if external_busy else "external_process_idle"
-                decisions.append(make_hold(gpu, config, reason=reason, assist=True))
-                continue
-            if external_stale and not holder_running and gpu.utilization < risk:
-                decisions.append(make_hold(gpu, config, reason="external_process_idle", assist=True))
-                continue
-            reason = "busy_process" if external_busy else "external_process"
-            decisions.append(make_release(gpu, reason))
-            continue
-        if gpu.utilization < risk:
-            decisions.append(make_hold(gpu, config, reason="below_risk", assist=False))
-        elif holder_running:
-            decisions.append(make_hold(gpu, config, reason="holder_running", assist=False))
-        else:
-            decisions.append(make_release(gpu, "risk_clear"))
-    return decisions
-
-
-def make_hold(gpu: GpuSnapshot, config: Config, *, reason: str, assist: bool) -> Decision:
-    spec = config.assist_mem if assist else config.mem
-    reserve = parse_bytes(config.reserve)
-    memory = (
-        resolve_memory_spec(spec, free=gpu.memory_free, reserve=reserve)
-        if assist
-        else resolve_memory_ratio(config.mem, total=gpu.memory_total, free=gpu.memory_free, reserve=reserve)
-    )
-    duty = max(config.min_duty_cycle, min(config.max_duty_cycle, config.target_util))
-    return Decision(
-        gpu_index=gpu.index,
-        action="hold",
-        reason=reason,
-        memory_bytes=memory,
-        duty_cycle=duty,
-        hold_mode="assist" if assist else "balanced",
-    )
-
-
-def make_release(gpu: GpuSnapshot, reason: str) -> Decision:
-    return Decision(gpu_index=gpu.index, action="release", reason=reason, memory_bytes=0, duty_cycle=0, hold_mode="-")
-
-
-def is_stale_process(process: GpuProcess) -> bool:
-    return process.name.strip() == "[Not Found]"
-
-
-def process_signature(processes: list[GpuProcess]) -> tuple[int, ...]:
-    return tuple(sorted(process.pid for process in processes))
-
-
 def read_snapshots(config: Config, workers: dict[int, WorkerProcess]) -> list[GpuSnapshot]:
     rows = run_csv(
         [
@@ -834,28 +751,6 @@ parse_mem_ratio = parse_ratio
 
 def format_ratio(value: float) -> str:
     return f"{float(value):g}"
-
-
-def resolve_memory_ratio(ratio: float, *, total: int, free: int, reserve: int) -> int:
-    requested = int(total * parse_ratio(ratio))
-    return max(0, min(requested, free - reserve))
-
-
-def resolve_memory_spec(spec: str, *, free: int, reserve: int) -> int:
-    requested = parse_bytes(spec)
-    return max(0, min(requested, free - reserve))
-
-
-def parse_bytes(raw: str) -> int:
-    text = str(raw).strip()
-    units = {"b": 1, "kib": 1024, "mib": 1024**2, "gib": 1024**3, "kb": 1000, "mb": 1000**2, "gb": 1000**3}
-    lowered = text.lower()
-    for unit, scale in sorted(units.items(), key=lambda item: -len(item[0])):
-        if lowered.endswith(unit):
-            return int(float(lowered[: -len(unit)]) * scale)
-    if lowered.isdigit():
-        return int(lowered)
-    raise ValueError(f"invalid byte size: {raw}")
 
 
 def mib(raw: str) -> int:

@@ -1,5 +1,5 @@
 name: Runtime support
-description: 请求帮助解释 status、events、doctor 输出或策略决策。
+description: 请求帮助解释 status、doctor、日志输出或策略决策。
 title: "[support]: "
 labels: ["support"]
 body:
@@ -11,8 +11,7 @@ body:
         ```bash
         gpu-holder doctor --json
         gpu-holder status --json
-        gpu-holder events --limit 50 --json
-        gpu-holder report --json
+        tail -n 80 ~/.gpu-holder/gpu-holder.log
         ```
   - type: textarea
     id: question
@@ -30,8 +29,7 @@ body:
     id: outputs
     attributes:
       label: 只读输出
-      description: 粘贴相关 doctor/status/events/report 输出。
-      render: json
+      description: 粘贴相关 doctor/status 输出和日志片段。
   - type: checkboxes
     id: safety
     attributes:

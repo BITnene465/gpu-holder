@@ -33,13 +33,13 @@ body:
     id: diagnostics
     attributes:
       label: 诊断输出
-      description: 粘贴 `gpu-holder doctor --json` 和相关 `gpu-holder report --json` 片段。
+      description: 粘贴 `gpu-holder doctor --json` 输出。
       render: json
   - type: textarea
     id: status
     attributes:
       label: 状态和事件
-      description: 粘贴相关 `gpu-holder status --json` 和 `gpu-holder events --json` 输出。
+      description: 粘贴相关 `gpu-holder status --json` 输出和 `~/.gpu-holder/gpu-holder.log` 片段。
       render: json
   - type: dropdown
     id: real_gpu

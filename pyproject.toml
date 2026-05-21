@@ -5,20 +5,19 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "gpu-holder"
 version = "0.1.0"
-description = "A polite GPU guard that keeps utilization high while yielding to real workloads."
+description = "Per-GPU CUDA holder that keeps shared training machines active while yielding to real jobs."
 readme = "README.md"
 requires-python = ">=3.10,<3.11"
-license = { text = "MIT" }
+license = "MIT"
 authors = [
-  { name = "gpu-holder contributors" },
+  { name = "BITnene465", email = "nene465suki@gmail.com" },
 ]
-keywords = ["gpu", "cuda", "nvidia", "utilization", "cli"]
+keywords = ["gpu", "cuda", "nvidia", "utilization", "training", "cli"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: Console",
   "Intended Audience :: Developers",
   "Intended Audience :: Science/Research",
-  "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.10",
   "Topic :: System :: Monitoring",
@@ -36,9 +35,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/nene/gpu-holder"
-Repository = "https://github.com/nene/gpu-holder"
-Issues = "https://github.com/nene/gpu-holder/issues"
+Homepage = "https://github.com/BITnene465/gpu-holder"
+Repository = "https://github.com/BITnene465/gpu-holder"
+Issues = "https://github.com/BITnene465/gpu-holder/issues"
 
 [project.scripts]
 gpu-holder = "gpu_holder.cli:main"
