@@ -61,7 +61,10 @@ def test_parser_only_exposes_current_commands() -> None:
 
 
 def test_readme_does_not_document_deleted_features() -> None:
-    content = (ROOT / "README.md").read_text(encoding="utf-8").lower()
+    content = (
+        (ROOT / "README.md").read_text(encoding="utf-8")
+        + (ROOT / "README.en.md").read_text(encoding="utf-8")
+    ).lower()
 
     assert (
         "gpu-holder guard --gpus 0-7 --risk-util 0.6 "
@@ -88,8 +91,11 @@ def test_repository_has_github_ready_safety_docs() -> None:
     manifest = (ROOT / "MANIFEST.in").read_text(encoding="utf-8")
     roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    readme_en = (ROOT / "README.en.md").read_text(encoding="utf-8")
     development_log = (ROOT / "docs" / "development_log.md").read_text(encoding="utf-8")
 
+    assert (ROOT / "README.en.md").exists()
+    assert (ROOT / "assets" / "logo.png").exists()
     assert (ROOT / "CONTRIBUTING.md").exists()
     assert (ROOT / "MANIFEST.in").exists()
     assert (ROOT / "ROADMAP.md").exists()
@@ -97,18 +103,27 @@ def test_repository_has_github_ready_safety_docs() -> None:
     assert (ROOT / "docs" / "development_log.md").exists()
     assert (ROOT / ".github" / "workflows" / "ci.yml").exists()
     assert (ROOT / ".github" / "pull_request_template.md").exists()
-    assert "## 中文" in readme
-    assert "## English" in readme
+    assert "[English](README.en.md)" in readme
+    assert "[中文](README.md)" in readme_en
+    assert "assets/logo.png" in readme
+    assert "assets/logo.png" in readme_en
+    assert "## English" not in readme
+    assert "## 中文" not in readme
+    assert "### Quick Start" in readme_en
+    assert "### 快速开始" in readme
     assert "外部 CUDA 进程只是只读调度信号。" in contributing
     assert "policy.py" in contributing
     assert "driver_backend.py" in contributing
     assert "telemetry.py" in contributing
     assert "worker_controls.py" in contributing
-    assert "worker_controls.py # backend-neutral duty cycle, jitter, and hold-mode controls" in readme
+    assert "worker_controls.py # backend-neutral duty cycle、jitter、hold-mode 控制" in readme
+    assert "worker_controls.py # backend-neutral duty cycle, jitter, and hold-mode controls" in readme_en
     assert "gpu-holder guard --gpus 0 --risk-util 0.6 --target-util 0.9 --mem 0 --backend driver --once" in contributing
+    assert "include README.en.md" in manifest
+    assert "recursive-include assets *.png" in manifest
     assert "ROADMAP.md" in readme
     assert "docs/development_log.md" in readme
-    assert "avoid PyTorch and use the experimental Driver API backend" in readme
+    assert "avoid PyTorch and use the experimental Driver API backend" in readme_en
     assert "近期优先级" in roadmap
     assert "非目标" in roadmap
     assert "兼容性现实" in roadmap

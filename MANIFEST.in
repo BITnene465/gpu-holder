@@ -1,4 +1,6 @@
 include CONTRIBUTING.md
+include README.en.md
 include ROADMAP.md
 include SECURITY.md
+recursive-include assets *.png
 recursive-include docs *.md
