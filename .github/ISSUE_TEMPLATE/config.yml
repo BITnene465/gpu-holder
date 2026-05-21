@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Security policy
+  - name: 安全策略
     url: https://github.com/BITnene465/gpu-holder/security/policy
-    about: Report safety or security issues using SECURITY.md.
+    about: 请按照 SECURITY.md 报告 safety 或 security 问题。

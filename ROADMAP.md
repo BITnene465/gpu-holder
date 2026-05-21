@@ -1,66 +1,65 @@
-# Roadmap
+# 路线图
 
-`gpu-holder` targets engineers and researchers who use shared NVIDIA training machines and need a
-small, auditable guard for idle GPU utilization.
+`gpu-holder` 面向使用共享 NVIDIA 训练机器的工程师和科研人员，目标是提供一个小型、
+可审计的 GPU 空闲利用率 guard。
 
-## Current Scope
+## 当前范围
 
-- Foreground and background guard CLI.
-- Per-GPU scheduling policy based on utilization, memory, and external CUDA processes.
-- Startup grace window for large external training or inference jobs.
-- PyTorch worker backend for real CUDA utilization.
-- Experimental NVIDIA Driver API worker backend for environments without PyTorch.
-- NVIDIA Driver API diagnostics with embedded PTX smoke through
-  `gpu-holder doctor --backend driver`.
-- Driver API implementation based on `ctypes + libcuda.so.1 + embedded conservative PTX`.
-- Read-only `nvidia-smi` telemetry.
-- No third-party runtime dependency for status, policy, and diagnostics.
+- 前台和后台 guard CLI。
+- 基于利用率、显存和外部 CUDA 进程的单卡调度策略。
+- 面向大型外部训练或推理任务的启动 grace window。
+- 用于真实 CUDA 利用率的 PyTorch worker backend。
+- 面向无 PyTorch 环境的实验性 NVIDIA Driver API worker backend。
+- 通过 `gpu-holder doctor --backend driver` 执行带内置 PTX smoke 的 NVIDIA Driver API 诊断。
+- 基于 `ctypes + libcuda.so.1 + embedded conservative PTX` 的 Driver API 实现。
+- 只读 `nvidia-smi` telemetry。
+- status、policy 和诊断没有第三方运行时依赖。
 
-## Near-Term Priorities
+## 近期优先级
 
-1. Harden the Driver API worker backend under real shared-machine workloads.
-2. Preserve `--backend torch` as a fallback for environments that already depend on PyTorch.
-3. Improve `CUDA_VISIBLE_DEVICES`, physical GPU index, and GPU UUID handling before making the
-   Driver API backend the default.
-4. Keep default tests GPU-free while documenting explicit manual CUDA smoke checks.
+1. 在真实共享机器负载下加固 Driver API worker backend。
+2. 保留 `--backend torch`，作为已依赖 PyTorch 环境的回退后端。
+3. 在把 Driver API backend 设为默认前，改进 `CUDA_VISIBLE_DEVICES`、物理 GPU index 和
+   GPU UUID 处理。
+4. 默认测试保持 GPU-free，同时文档化明确的手动 CUDA smoke 检查。
 
-## Compatibility Reality
+## 兼容性现实
 
-The Driver API direction is meant to make `gpu-holder` easier to run on shared NVIDIA training
-machines. It is not a promise that every machine can run it.
+Driver API 方向是为了让 `gpu-holder` 更容易在共享 NVIDIA 训练机器上运行。它不是“所有机器
+都能跑”的承诺。
 
-Expected baseline:
+预期 baseline：
 
-- Linux.
-- NVIDIA driver installed and healthy.
-- `libcuda.so.1` visible to the process.
-- Target CUDA devices exposed through `/dev/nvidia*`.
-- Driver new enough to JIT the embedded PTX.
+- Linux。
+- NVIDIA driver 已安装且健康。
+- 进程能看到 `libcuda.so.1`。
+- 目标 CUDA 设备通过 `/dev/nvidia*` 暴露。
+- driver 足够新，可以 JIT 内置 PTX。
 
-Still not covered:
+仍不覆盖：
 
-- machines without NVIDIA GPUs
-- broken driver installs
-- containers without driver libraries or GPU device mounts
-- non-NVIDIA GPUs
-- macOS
-- Windows until a separate `nvcuda.dll` path exists
+- 没有 NVIDIA GPU 的机器。
+- 损坏或缺失的 driver 安装。
+- 没有挂载 driver library 或 GPU device 的容器。
+- 非 NVIDIA GPU。
+- macOS。
+- Windows，直到单独实现 `nvcuda.dll` 路径。
 
-## Non-Goals
+## 非目标
 
-- Managing, killing, suspending, renicing, or otherwise controlling external GPU jobs.
-- Replacing cluster schedulers, job queues, or quota systems.
-- Guaranteeing compatibility with non-NVIDIA GPUs.
-- Claiming support for every machine or every operating system.
-- Adding heavyweight monitoring stacks or dashboards to the core package.
+- 管理、杀死、挂起、renice 或以其他方式控制外部 GPU 任务。
+- 替代集群调度器、任务队列或 quota 系统。
+- 保证兼容非 NVIDIA GPU。
+- 宣称支持每一台机器或每一种操作系统。
+- 在核心包中加入重型 monitoring stack 或 dashboard。
 
-## Default Backend Graduation Criteria
+## 默认后端毕业标准
 
-The Driver API backend can become the default only after:
+只有满足以下条件后，Driver API backend 才能成为默认 backend：
 
-- `gpu-holder doctor --backend driver` validates driver load, device count, PTX JIT, and a tiny
-  kernel launch.
-- `gpu-holder guard --backend driver --once` starts and stops one worker cleanly.
-- Foreground shutdown leaves no lingering holder workers.
-- `CUDA_VISIBLE_DEVICES` remapping is verified by tests or documented manual checks.
-- The PyTorch backend remains available and documented as a fallback.
+- `gpu-holder doctor --backend driver` 验证 driver load、device count、PTX JIT 和极小
+  kernel launch。
+- `gpu-holder guard --backend driver --once` 能干净地启动并停止一个 worker。
+- 前台关闭后没有残留 holder worker。
+- `CUDA_VISIBLE_DEVICES` remapping 由测试覆盖，或有文档化的手动检查。
+- PyTorch backend 仍然可用，并作为回退路径写入文档。

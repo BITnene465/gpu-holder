@@ -97,7 +97,9 @@ def test_repository_has_github_ready_safety_docs() -> None:
     assert (ROOT / "docs" / "development_log.md").exists()
     assert (ROOT / ".github" / "workflows" / "ci.yml").exists()
     assert (ROOT / ".github" / "pull_request_template.md").exists()
-    assert "External CUDA processes are read-only scheduling signals." in contributing
+    assert "## 中文" in readme
+    assert "## English" in readme
+    assert "外部 CUDA 进程只是只读调度信号。" in contributing
     assert "policy.py" in contributing
     assert "driver_backend.py" in contributing
     assert "telemetry.py" in contributing
@@ -107,30 +109,30 @@ def test_repository_has_github_ready_safety_docs() -> None:
     assert "ROADMAP.md" in readme
     assert "docs/development_log.md" in readme
     assert "avoid PyTorch and use the experimental Driver API backend" in readme
-    assert "Near-Term Priorities" in roadmap
-    assert "Non-Goals" in roadmap
-    assert "Compatibility Reality" in roadmap
-    assert "It is not a promise that every machine can run it." in roadmap
-    assert "embedded PTX smoke" in roadmap
+    assert "近期优先级" in roadmap
+    assert "非目标" in roadmap
+    assert "兼容性现实" in roadmap
+    assert "所有机器\n都能跑" in roadmap
+    assert "内置 PTX smoke" in roadmap
     assert "ctypes + libcuda.so.1 + embedded conservative PTX" in roadmap
-    assert "Managing, killing, suspending, renicing" in roadmap
+    assert "管理、杀死、挂起、renice" in roadmap
     assert "include ROADMAP.md" in manifest
     assert "recursive-include docs *.md" in manifest
-    assert "Driver backend compatibility boundary" in development_log
-    assert "Linux machines with an NVIDIA driver and accessible CUDA devices" in development_log
+    assert "Driver backend 兼容性边界" in development_log
+    assert "在有 NVIDIA driver 且 CUDA 设备可访问的 Linux 机器上工作" in development_log
     assert "worker_controls.py" in development_log
 
 
-def test_github_templates_are_english_and_safety_focused() -> None:
+def test_github_templates_are_chinese_and_safety_focused() -> None:
     bug = (ROOT / ".github" / "ISSUE_TEMPLATE" / "bug_report.yml").read_text(encoding="utf-8")
     feature = (ROOT / ".github" / "ISSUE_TEMPLATE" / "feature_request.yml").read_text(encoding="utf-8")
     support = (ROOT / ".github" / "ISSUE_TEMPLATE" / "support.yml").read_text(encoding="utf-8")
     pr = (ROOT / ".github" / "pull_request_template.md").read_text(encoding="utf-8")
 
-    assert "Report scheduling, CLI, daemon, or diagnostic behavior issues." in bug
-    assert "Propose policy, worker, CLI, diagnostics" in feature
-    assert "Prefer read-only commands for support requests" in support
-    assert "External GPU process metadata remains a read-only scheduling signal." in pr
+    assert "报告调度、CLI、daemon 或诊断行为问题。" in bug
+    assert "提议 policy、worker、CLI、诊断、打包或文档改进。" in feature
+    assert "支持请求优先使用只读命令" in support
+    assert "外部 GPU 进程 metadata 仍然只是只读调度信号。" in pr
 
 
 def test_backend_strategy_documents_compatibility_boundary() -> None:
@@ -141,12 +143,12 @@ def test_backend_strategy_documents_compatibility_boundary() -> None:
     assert "gpu-holder doctor --backend torch" in content
     assert "gpu-holder doctor --backend driver" in content
     assert "gpu-holder guard --backend driver" in content
-    assert "experimental but usable as a worker" in content
-    assert "tiny embedded PTX kernel can be JIT-compiled" in content
-    assert "Driver API worker intentionally uses one conservative spin kernel" in content
+    assert "实验性能力，但已经可作为 worker 使用" in content
+    assert "很小的内置 PTX kernel 是否能 JIT" in content
+    assert "Driver API worker 故意只使用一个保守的 spin\nkernel" in content
     assert "worker_controls.py" in content
-    assert "backend-neutral duty-cycle, burst jitter, and hold-mode semantics" in content
-    assert "Works on Linux machines with an NVIDIA driver and accessible CUDA devices." in content
-    assert 'It should not be documented as "works on every machine".' in content
+    assert "backend-neutral duty-cycle、burst jitter 和 hold-mode 语义" in content
+    assert "在有 NVIDIA driver 且 CUDA 设备可访问的 Linux 机器上工作。" in content
+    assert "不应写成“所有机器都能跑”。" in content
     assert "CUDA_VISIBLE_DEVICES" in content
     assert "docs/backend_strategy.md" in readme

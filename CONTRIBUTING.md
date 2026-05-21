@@ -1,16 +1,16 @@
-# Contributing
+# 贡献指南
 
-`gpu-holder` is a small operations tool for shared NVIDIA training machines. Changes should keep
-the project easy to install, easy to audit, and conservative around other users' jobs.
+`gpu-holder` 是面向共享 NVIDIA 训练机器的小型运维工具。任何变更都应保持项目易安装、
+易审计，并且对其他用户的任务保持保守。
 
-## Development Setup
+## 开发环境
 
 ```bash
 python -m pip install -e ".[dev]"
-python -m pip install -e ".[torch]"  # optional, only needed for real CUDA worker tests
+python -m pip install -e ".[torch]"  # 可选，仅真实 CUDA worker 测试需要
 ```
 
-Run the normal local checks before opening a pull request:
+提交 pull request 前请先运行常规本地检查：
 
 ```bash
 python -m ruff check --no-cache src tests
@@ -19,39 +19,38 @@ PYTHONPYCACHEPREFIX=/tmp/gpu-holder-pycache python -m compileall -q src tests
 python -m build
 ```
 
-## Safety Rules
+## 安全规则
 
-These invariants are part of the project contract:
+以下不变量属于项目契约：
 
-- External CUDA processes are read-only scheduling signals.
-- `gpu-holder` must only stop the guard and worker processes it created.
-- Do not add behavior that kills, suspends, renices, ptraces, or otherwise controls external jobs.
-- Prefer releasing a holder over risking interference with a training or inference process.
-- Real CUDA smoke tests must only run on GPUs you own or know are idle.
+- 外部 CUDA 进程只是只读调度信号。
+- `gpu-holder` 只能停止自己创建的 guard 和 worker 进程。
+- 不得增加杀死、挂起、renice、ptrace 或以其他方式控制外部任务的行为。
+- 如果存在干扰训练或推理进程的风险，优先释放自己的 holder。
+- 真实 CUDA smoke test 只允许在你拥有或确认空闲的 GPU 上运行。
 
-## Architecture Rules
+## 架构规则
 
-- Keep per-GPU scheduling decisions in `policy.py`.
-- Keep CLI, daemon lifecycle, and status files in `cli.py`.
-- Keep read-only `nvidia-smi` collection and GPU snapshot parsing in `telemetry.py`.
-- Keep worker process startup, shutdown, and backend dispatch in `worker.py`.
-- Keep backend-neutral worker timing and hold-mode controls in `worker_controls.py`.
-- Keep PyTorch-specific compute code in `torch_backend.py`.
-- Keep NVIDIA Driver API diagnostics and worker code in `driver_backend.py`.
-- Keep backend names, validation, and health-check dispatch in `backends.py`.
+- 单卡调度决策放在 `policy.py`。
+- CLI、daemon 生命周期和状态文件放在 `cli.py`。
+- 只读 `nvidia-smi` 采集和 GPU snapshot 解析放在 `telemetry.py`。
+- worker 进程启动、关闭和 backend dispatch 放在 `worker.py`。
+- backend-neutral worker timing 和 hold-mode 控制放在 `worker_controls.py`。
+- PyTorch 专属计算代码放在 `torch_backend.py`。
+- NVIDIA Driver API 诊断和 worker 代码放在 `driver_backend.py`。
+- backend 名称、校验和健康检查 dispatch 放在 `backends.py`。
 
-The policy layer should stay backend-neutral and should not import PyTorch, `ctypes`, or subprocess
-worker implementations.
+`policy.py` 必须保持 backend-neutral，不应导入 PyTorch、`ctypes` 或 subprocess worker
+实现。
 
-See [ROADMAP.md](ROADMAP.md) before expanding scope. New features should preserve the project
-non-goals and safety boundary.
+扩展范围前先阅读 [ROADMAP.md](ROADMAP.md)。新增功能必须保留项目 non-goals 和安全边界。
 
-## Testing Guidance
+## 测试指南
 
-Use unit tests for policy, parsing, status payloads, backend validation, and worker lifecycle.
-Do not require real GPUs in the default test suite.
+policy、解析、状态 payload、backend 校验和 worker 生命周期使用单元测试覆盖。默认测试套件
+不应依赖真实 GPU。
 
-Use manual GPU checks only when a change affects real CUDA behavior:
+只有变更影响真实 CUDA 行为时，才运行手动 GPU 检查：
 
 ```bash
 gpu-holder doctor --json
@@ -60,4 +59,4 @@ gpu-holder guard --gpus 0 --risk-util 0.6 --target-util 0.9 --mem 0 --backend dr
 gpu-holder guard --gpus 0 --risk-util 0.6 --target-util 0.9 --mem 0.05 --backend torch --once
 ```
 
-Include the commands you ran in the pull request.
+请在 pull request 中写明你运行过的命令。

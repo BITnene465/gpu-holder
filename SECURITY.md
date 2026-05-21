@@ -1,28 +1,29 @@
-# Security Policy
+# 安全策略
 
-`gpu-holder` is designed for shared GPU machines. Its safety boundary is intentionally narrow:
+`gpu-holder` 面向共享 GPU 机器设计。它的安全边界故意保持很窄：
 
-- It may start and stop only the guard and worker processes it created.
-- It must treat external CUDA processes as read-only scheduling signals.
-- It must not kill, suspend, renice, ptrace, or otherwise control external jobs.
-- It should prefer releasing its own holder over risking interference with a training job.
+- 只允许启动和停止自己创建的 guard 与 worker 进程。
+- 外部 CUDA 进程必须只作为只读调度信号。
+- 不得杀死、挂起、renice、ptrace 或以其他方式控制外部任务。
+- 如果存在干扰训练任务的风险，应优先释放自己的 holder。
 
-## Reporting
+## 报告方式
 
-Please report safety or security issues privately through GitHub's private vulnerability reporting for this repository:
+请通过本仓库的 GitHub private vulnerability reporting 私下报告安全或 safety 问题：
 
 https://github.com/BITnene465/gpu-holder/security/advisories/new
 
-If private vulnerability reporting is unavailable, open a minimal issue without sensitive logs and ask for a private contact path.
+如果 private vulnerability reporting 不可用，请创建一个不包含敏感日志的最小 issue，并请求
+私下联系方式。
 
-## Useful Context
+## 有用上下文
 
-When reporting behavior issues, include:
+报告行为问题时，请尽量包含：
 
 - `gpu-holder doctor --json`
 - `gpu-holder status --json`
-- the exact command used to start the guard
-- relevant `~/.gpu-holder/gpu-holder.log` lines
-- GPU model, driver version, and whether the run happened inside a container
+- 启动 guard 的完整命令。
+- 相关 `~/.gpu-holder/gpu-holder.log` 片段。
+- GPU 型号、driver 版本，以及是否在容器内运行。
 
-Do not include secrets, access tokens, private dataset paths, or proprietary training logs.
+不要包含 secret、access token、私有数据集路径或专有训练日志。

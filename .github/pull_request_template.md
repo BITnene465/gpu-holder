@@ -1,16 +1,16 @@
-## Summary
+## 摘要
 
 - 
 
-## Verification
+## 验证
 
 - [ ] `python -m ruff check --no-cache src tests`
 - [ ] `python -m pytest -q`
 - [ ] `PYTHONPYCACHEPREFIX=/tmp/gpu-holder-pycache python -m compileall -q src tests`
-- [ ] Behavior changes are documented in README, docs, or examples
+- [ ] 行为变化已写入 README、docs 或示例
 
-## Safety
+## 安全
 
-- [ ] This change does not kill, suspend, renice, or otherwise control external GPU processes.
-- [ ] External GPU process metadata remains a read-only scheduling signal.
-- [ ] Real CUDA smoke tests were only run on idle GPUs or GPUs I explicitly own.
+- [ ] 本变更不会杀死、挂起、renice 或以其他方式控制外部 GPU 进程。
+- [ ] 外部 GPU 进程 metadata 仍然只是只读调度信号。
+- [ ] 真实 CUDA smoke test 只在空闲 GPU 或我明确拥有的 GPU 上运行。
