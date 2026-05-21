@@ -7,6 +7,9 @@ from typing import Any
 from typing import Callable
 
 from .backends import BackendCheck
+from .worker_controls import jittered_burst_seconds
+from .worker_controls import normalize_hold_mode
+from .worker_controls import sleep_seconds_for_duty
 
 
 DEFAULT_CUDA_LIBRARY = "libcuda.so.1"
@@ -230,7 +233,7 @@ def run_driver_worker(
             functions["cuModuleGetFunction"](ctypes.byref(kernel), module, b"gpu_holder_spin"),
             "cuModuleGetFunction",
         )
-        mode = _normalize_hold_mode(hold_mode)
+        mode = normalize_hold_mode(hold_mode)
         if mode != "compute-only":
             allocations = _allocate_driver_memory(
                 cu_mem_alloc=functions["cuMemAlloc"],
@@ -336,7 +339,7 @@ def _run_driver_loop(
     jitter = max(0.0, min(1.0, float(burst_jitter)))
     duty = max(0.0, min(1.0, float(duty_cycle)))
     while True:
-        current_burst_seconds = _jittered_burst_seconds(base_burst_seconds, jitter, rng=rng)
+        current_burst_seconds = jittered_burst_seconds(base_burst_seconds, jitter, rng=rng)
         compute_seconds = current_burst_seconds
         if hold_mode != "memory-only":
             started = time.monotonic()
@@ -344,7 +347,7 @@ def _run_driver_loop(
                 _launch_spin_kernel(cu_launch_kernel=cu_launch_kernel, kernel=kernel)
                 _driver_call(cu_ctx_synchronize(), "cuCtxSynchronize")
             compute_seconds = time.monotonic() - started
-        sleep_seconds = _sleep_seconds_for_duty(burst_seconds=compute_seconds, duty=duty)
+        sleep_seconds = sleep_seconds_for_duty(burst_seconds=compute_seconds, duty=duty)
         if sleep_seconds > 0:
             time.sleep(sleep_seconds)
 
@@ -374,30 +377,6 @@ def _driver_call(result: int, name: str) -> None:
     code = int(result)
     if code != 0:
         raise RuntimeError(f"{name} failed with CUDA driver error code {code}")
-
-
-def _jittered_burst_seconds(base_seconds: float, jitter: float, *, rng: object | None = None) -> float:
-    base = max(0.001, float(base_seconds))
-    amount = max(0.0, min(1.0, float(jitter)))
-    if amount <= 0:
-        return base
-    chooser = rng if rng is not None else random
-    factor = 1.0 + float(chooser.uniform(-amount, amount))
-    return max(0.001, base * factor)
-
-
-def _sleep_seconds_for_duty(*, burst_seconds: float, duty: float) -> float:
-    duty = max(0.0, min(1.0, float(duty)))
-    if duty <= 0:
-        return 1.0
-    return max(0.0, float(burst_seconds) * (1.0 - duty) / duty)
-
-
-def _normalize_hold_mode(mode: str) -> str:
-    normalized = str(mode).strip().lower()
-    if normalized in {"balanced", "memory-only", "compute-only", "assist"}:
-        return normalized
-    raise ValueError(f"unknown hold mode: {mode!r}")
 
 
 def _put_ready_message(queue: Any, message: dict[str, Any]) -> None:

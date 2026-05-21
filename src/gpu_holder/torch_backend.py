@@ -6,6 +6,9 @@ from typing import Any
 from typing import Callable
 
 from .backends import require_torch
+from .worker_controls import jittered_burst_seconds
+from .worker_controls import normalize_hold_mode
+from .worker_controls import sleep_seconds_for_duty
 
 
 BASE_PROGRAMS = ("matmul", "conv", "fft", "elementwise")
@@ -26,7 +29,7 @@ def run_torch_worker(
 ) -> None:
     torch = require_torch()
     torch.cuda.set_device(int(gpu_index))
-    mode = _normalize_hold_mode(hold_mode)
+    mode = normalize_hold_mode(hold_mode)
     allocate_bytes = 0 if mode == "compute-only" else max(0, int(memory_bytes))
     holder = _allocate_memory(torch=torch, memory_bytes=allocate_bytes, gpu_index=gpu_index)
     programs = _program_sequence(program)
@@ -39,7 +42,7 @@ def run_torch_worker(
     _put_ready_message(ready_queue, {"status": "ready"})
 
     while True:
-        current_burst_seconds = _jittered_burst_seconds(base_burst_seconds, jitter, rng=rng)
+        current_burst_seconds = jittered_burst_seconds(base_burst_seconds, jitter, rng=rng)
         compute_seconds = current_burst_seconds
         if mode != "memory-only":
             selected = _next_program(
@@ -53,7 +56,7 @@ def run_torch_worker(
             while time.monotonic() - started < current_burst_seconds:
                 _run_program(torch=torch, name=selected, gpu_index=gpu_index)
             compute_seconds = time.monotonic() - started
-        sleep_seconds = _sleep_seconds_for_duty(
+        sleep_seconds = sleep_seconds_for_duty(
             burst_seconds=compute_seconds,
             duty=duty,
         )
@@ -107,32 +110,8 @@ def _next_program(
     return programs[int(cursor) % len(programs)]
 
 
-def _jittered_burst_seconds(base_seconds: float, jitter: float, *, rng: object | None = None) -> float:
-    base = max(0.001, float(base_seconds))
-    amount = max(0.0, min(1.0, float(jitter)))
-    if amount <= 0:
-        return base
-    chooser = rng if rng is not None else random
-    factor = 1.0 + float(chooser.uniform(-amount, amount))
-    return max(0.001, base * factor)
-
-
-def _sleep_seconds_for_duty(*, burst_seconds: float, duty: float) -> float:
-    duty = max(0.0, min(1.0, float(duty)))
-    if duty <= 0:
-        return 1.0
-    return max(0.0, float(burst_seconds) * (1.0 - duty) / duty)
-
-
 def _normalize_program(program: str) -> str:
     return str(program).strip().lower()
-
-
-def _normalize_hold_mode(mode: str) -> str:
-    normalized = str(mode).strip().lower()
-    if normalized in {"balanced", "memory-only", "compute-only", "assist"}:
-        return normalized
-    raise ValueError(f"unknown hold mode: {mode!r}")
 
 
 def _run_program(*, torch: object, name: str, gpu_index: int) -> None:
@@ -183,4 +162,3 @@ def _put_ready_message(queue: Any, message: dict[str, Any]) -> None:
         queue.put_nowait(message)
     except Exception:
         pass
-

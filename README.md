@@ -121,6 +121,7 @@ src/gpu_holder/
   policy.py    # per-GPU scheduling policy and memory sizing
   telemetry.py # read-only nvidia-smi collection and snapshot parsing
   worker.py    # worker process lifecycle and backend dispatch
+  worker_controls.py # backend-neutral duty cycle, jitter, and hold-mode controls
   torch_backend.py # PyTorch CUDA worker implementation
   __main__.py
 ```

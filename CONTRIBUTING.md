@@ -35,6 +35,7 @@ These invariants are part of the project contract:
 - Keep CLI, daemon lifecycle, and status files in `cli.py`.
 - Keep read-only `nvidia-smi` collection and GPU snapshot parsing in `telemetry.py`.
 - Keep worker process startup, shutdown, and backend dispatch in `worker.py`.
+- Keep backend-neutral worker timing and hold-mode controls in `worker_controls.py`.
 - Keep PyTorch-specific compute code in `torch_backend.py`.
 - Keep NVIDIA Driver API diagnostics and worker code in `driver_backend.py`.
 - Keep backend names, validation, and health-check dispatch in `backends.py`.

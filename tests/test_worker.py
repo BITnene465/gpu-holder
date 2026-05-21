@@ -7,17 +7,18 @@ import gpu_holder.worker as worker_mod
 from gpu_holder.torch_backend import (
     MATMUL_SIZE,
     _PROGRAM_CACHE,
-    _jittered_burst_seconds,
     _next_program,
     _program_sequence,
     _run_program,
-    _sleep_seconds_for_duty,
 )
 from gpu_holder.worker import (
     WorkerProcess,
     WorkerStartError,
     _worker_main,
 )
+from gpu_holder.worker_controls import jittered_burst_seconds
+from gpu_holder.worker_controls import normalize_hold_mode
+from gpu_holder.worker_controls import sleep_seconds_for_duty
 
 
 def test_program_sequence_supports_random_mode() -> None:
@@ -66,14 +67,22 @@ def test_jittered_burst_seconds_uses_symmetric_jitter() -> None:
             assert high == 0.25
             return 0.20
 
-    assert _jittered_burst_seconds(0.5, 0.25, rng=FakeRng()) == 0.6
-    assert _jittered_burst_seconds(0.5, 0.0, rng=FakeRng()) == 0.5
+    assert jittered_burst_seconds(0.5, 0.25, rng=FakeRng()) == 0.6
+    assert jittered_burst_seconds(0.5, 0.0, rng=FakeRng()) == 0.5
 
 
 def test_sleep_seconds_for_duty_preserves_average_duty() -> None:
-    assert _sleep_seconds_for_duty(burst_seconds=0.2, duty=0.5) == 0.2
-    assert _sleep_seconds_for_duty(burst_seconds=0.2, duty=1.0) == 0.0
-    assert _sleep_seconds_for_duty(burst_seconds=0.2, duty=0.0) == 1.0
+    assert sleep_seconds_for_duty(burst_seconds=0.2, duty=0.5) == 0.2
+    assert sleep_seconds_for_duty(burst_seconds=0.2, duty=1.0) == 0.0
+    assert sleep_seconds_for_duty(burst_seconds=0.2, duty=0.0) == 1.0
+
+
+def test_normalize_hold_mode_accepts_known_modes_and_rejects_unknown() -> None:
+    assert normalize_hold_mode(" ASSIST ") == "assist"
+    assert normalize_hold_mode("memory-only") == "memory-only"
+
+    with pytest.raises(ValueError, match="unknown hold mode"):
+        normalize_hold_mode("unknown")
 
 
 def test_matmul_program_reuses_large_cached_tensors() -> None:

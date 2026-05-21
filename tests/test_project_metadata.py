@@ -39,6 +39,7 @@ def test_source_tree_is_trimmed_to_cli_and_worker() -> None:
         "telemetry.py",
         "torch_backend.py",
         "worker.py",
+        "worker_controls.py",
     }
 
 
@@ -98,6 +99,8 @@ def test_repository_has_github_ready_safety_docs() -> None:
     assert "policy.py" in contributing
     assert "driver_backend.py" in contributing
     assert "telemetry.py" in contributing
+    assert "worker_controls.py" in contributing
+    assert "worker_controls.py # backend-neutral duty cycle, jitter, and hold-mode controls" in readme
     assert "gpu-holder guard --gpus 0 --risk-util 0.6 --target-util 0.9 --mem 0 --backend driver --once" in contributing
     assert "ROADMAP.md" in readme
     assert "avoid PyTorch and use the experimental Driver API backend" in readme
@@ -135,6 +138,8 @@ def test_backend_strategy_documents_compatibility_boundary() -> None:
     assert "experimental but usable as a worker" in content
     assert "tiny embedded PTX kernel can be JIT-compiled" in content
     assert "Driver API worker intentionally uses one conservative spin kernel" in content
+    assert "worker_controls.py" in content
+    assert "backend-neutral duty-cycle, burst jitter, and hold-mode semantics" in content
     assert "Works on Linux machines with an NVIDIA driver and accessible CUDA devices." in content
     assert 'It should not be documented as "works on every machine".' in content
     assert "CUDA_VISIBLE_DEVICES" in content
