@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from gpu_holder.backends import check_driver_cuda
 from gpu_holder.backends import normalize_backend
 from gpu_holder.backends import normalize_diagnostic_backend
+from gpu_holder.driver_backend import check_driver_cuda
 
 
 class FakeCudaFunction:
@@ -91,4 +91,3 @@ def test_driver_cuda_check_reports_driver_api_error_codes() -> None:
 
     assert check.ok is False
     assert check.detail == "cuInit_failed code=100"
-
