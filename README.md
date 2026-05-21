@@ -145,6 +145,9 @@ acceptance criteria before switching the default backend.
 
 ## Development
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for architecture rules, safety invariants, and pull request
+expectations.
+
 ```bash
 python -m pip install -e ".[dev]"
 python -m ruff check --no-cache src tests

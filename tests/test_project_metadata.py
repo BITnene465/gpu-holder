@@ -82,9 +82,27 @@ def test_readme_does_not_document_deleted_features() -> None:
 
 
 def test_repository_has_github_ready_safety_docs() -> None:
+    contributing = (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8")
+
+    assert (ROOT / "CONTRIBUTING.md").exists()
     assert (ROOT / "SECURITY.md").exists()
     assert (ROOT / ".github" / "workflows" / "ci.yml").exists()
     assert (ROOT / ".github" / "pull_request_template.md").exists()
+    assert "External CUDA processes are read-only scheduling signals." in contributing
+    assert "policy.py" in contributing
+    assert "driver_backend.py" in contributing
+
+
+def test_github_templates_are_english_and_safety_focused() -> None:
+    bug = (ROOT / ".github" / "ISSUE_TEMPLATE" / "bug_report.yml").read_text(encoding="utf-8")
+    feature = (ROOT / ".github" / "ISSUE_TEMPLATE" / "feature_request.yml").read_text(encoding="utf-8")
+    support = (ROOT / ".github" / "ISSUE_TEMPLATE" / "support.yml").read_text(encoding="utf-8")
+    pr = (ROOT / ".github" / "pull_request_template.md").read_text(encoding="utf-8")
+
+    assert "Report scheduling, CLI, daemon, or diagnostic behavior issues." in bug
+    assert "Propose policy, worker, CLI, diagnostics" in feature
+    assert "Prefer read-only commands for support requests" in support
+    assert "External GPU process metadata remains a read-only scheduling signal." in pr
 
 
 def test_backend_strategy_documents_compatibility_boundary() -> None:

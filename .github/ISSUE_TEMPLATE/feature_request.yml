@@ -1,26 +1,26 @@
 name: Feature request
-description: 提议策略、worker、CLI、诊断、打包或文档改进。
+description: Propose policy, worker, CLI, diagnostics, packaging, or documentation improvements.
 title: "[feature]: "
 labels: ["enhancement"]
 body:
   - type: textarea
     id: problem
     attributes:
-      label: 问题
-      description: 这个功能要解决什么工作流或运维问题？
+      label: Problem
+      description: What workflow or operations problem should this solve?
     validations:
       required: true
   - type: textarea
     id: proposal
     attributes:
-      label: 方案
-      description: 描述行为、CLI 入口和期望默认值。
+      label: Proposal
+      description: Describe the behavior, CLI entry point, and expected defaults.
     validations:
       required: true
   - type: dropdown
     id: area
     attributes:
-      label: 范围
+      label: Area
       options:
         - Policy / scheduler
         - Worker program / hold mode
@@ -34,13 +34,14 @@ body:
   - type: textarea
     id: safety
     attributes:
-      label: 安全考虑
+      label: Safety considerations
       description: |
-        如何保持“外部 GPU 进程只是只读调度信号，不能成为控制目标”这个不变量？
+        How will this preserve the invariant that external GPU processes are read-only scheduling
+        signals and must not become control targets?
     validations:
       required: true
   - type: textarea
     id: alternatives
     attributes:
-      label: 备选方案
-      description: 有什么更简单的 workaround 或被放弃的设计？
+      label: Alternatives
+      description: What simpler workarounds or rejected designs did you consider?

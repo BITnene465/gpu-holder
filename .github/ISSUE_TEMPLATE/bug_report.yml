@@ -1,60 +1,61 @@
 name: Bug report
-description: 报告调度、CLI、daemon 或诊断行为异常。
+description: Report scheduling, CLI, daemon, or diagnostic behavior issues.
 title: "[bug]: "
 labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        感谢反馈问题。`gpu-holder` 不应该 kill 或控制外部 GPU 进程；如果你怀疑这个安全边界被破坏，请附上证据。
+        Thanks for reporting a bug. `gpu-holder` must not kill or control external GPU processes.
+        If you think this safety boundary was violated, include the evidence.
   - type: textarea
     id: summary
     attributes:
-      label: 问题摘要
-      description: 发生了什么？
+      label: Summary
+      description: What happened?
     validations:
       required: true
   - type: textarea
     id: expected
     attributes:
-      label: 期望行为
-      description: 本来应该发生什么？
+      label: Expected behavior
+      description: What should have happened?
     validations:
       required: true
   - type: textarea
     id: commands
     attributes:
-      label: 执行命令
-      description: 粘贴完整命令，只隐藏密钥。
+      label: Commands
+      description: Paste the full commands. Redact only secrets.
       render: shell
     validations:
       required: true
   - type: textarea
     id: diagnostics
     attributes:
-      label: 诊断输出
-      description: 粘贴 `gpu-holder doctor --json` 输出。
+      label: Diagnostic output
+      description: Paste `gpu-holder doctor --json` output.
       render: json
   - type: textarea
     id: status
     attributes:
-      label: 状态和事件
-      description: 粘贴相关 `gpu-holder status --json` 输出和 `~/.gpu-holder/gpu-holder.log` 片段。
+      label: Status and logs
+      description: Paste relevant `gpu-holder status --json` output and `~/.gpu-holder/gpu-holder.log` snippets.
       render: json
   - type: dropdown
     id: real_gpu
     attributes:
-      label: 是否运行了真实 CUDA holder worker？
+      label: Did you run a real CUDA holder worker?
       options:
-        - "否"
-        - "是，在空闲或明确拥有的 GPU 上"
-        - "是，在共享或繁忙 GPU 上"
+        - "No"
+        - "Yes, on idle GPUs or GPUs I explicitly own"
+        - "Yes, on shared or busy GPUs"
     validations:
       required: true
   - type: checkboxes
     id: safety
     attributes:
-      label: 安全确认
+      label: Safety confirmation
       options:
-        - label: 我没有要求 `gpu-holder` kill 或控制外部 GPU 进程。
+        - label: I did not ask `gpu-holder` to kill or control external GPU processes.
           required: true
