@@ -63,6 +63,11 @@ def test_guard_parser_exposes_worker_backend() -> None:
 
     assert config.backend == "torch"
 
+    driver_args = build_parser().parse_args(["guard", "--backend", "driver"])
+    driver_config = config_from_args(driver_args)
+
+    assert driver_config.backend == "driver"
+
 
 def test_doctor_parser_accepts_driver_diagnostic_backend() -> None:
     args = build_parser().parse_args(["doctor", "--backend", "driver"])

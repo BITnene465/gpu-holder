@@ -257,5 +257,40 @@ def test_worker_main_dispatches_to_torch_backend(monkeypatch) -> None:
     ]
 
 
+def test_worker_main_dispatches_to_driver_backend(monkeypatch) -> None:
+    calls: list[dict[str, object]] = []
+    ready_queue = object()
+
+    def fake_driver_worker_main(**kwargs: object) -> None:
+        calls.append(kwargs)
+
+    monkeypatch.setattr(worker_mod, "run_driver_worker", fake_driver_worker_main)
+
+    _worker_main(
+        gpu_index=0,
+        memory_bytes=1024,
+        duty_cycle=0.5,
+        program="matmul",
+        hold_mode="balanced",
+        backend="driver",
+        burst_seconds=0.2,
+        burst_jitter=0.1,
+        ready_queue=ready_queue,
+    )
+
+    assert calls == [
+        {
+            "gpu_index": 0,
+            "memory_bytes": 1024,
+            "duty_cycle": 0.5,
+            "program": "matmul",
+            "hold_mode": "balanced",
+            "burst_seconds": 0.2,
+            "burst_jitter": 0.1,
+            "ready_queue": ready_queue,
+        }
+    ]
+
+
 def test_torch_backend_owns_program_implementation() -> None:
     assert torch_backend_mod.BASE_PROGRAMS == ("matmul", "conv", "fft", "elementwise")

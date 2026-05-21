@@ -8,6 +8,7 @@ from typing import Any
 
 from .backends import DEFAULT_BACKEND
 from .backends import normalize_backend
+from .driver_backend import run_driver_worker
 from .torch_backend import run_torch_worker
 
 
@@ -149,18 +150,31 @@ def _worker_main(
     ready_queue: mp.Queue[dict[str, Any]],
 ) -> None:
     normalized_backend = normalize_backend(backend)
-    if normalized_backend != "torch":
-        raise RuntimeError(f"unhandled worker backend: {normalized_backend}")
-    run_torch_worker(
-        gpu_index=gpu_index,
-        memory_bytes=memory_bytes,
-        duty_cycle=duty_cycle,
-        program=program,
-        hold_mode=hold_mode,
-        burst_seconds=burst_seconds,
-        burst_jitter=burst_jitter,
-        ready_queue=ready_queue,
-    )
+    if normalized_backend == "torch":
+        run_torch_worker(
+            gpu_index=gpu_index,
+            memory_bytes=memory_bytes,
+            duty_cycle=duty_cycle,
+            program=program,
+            hold_mode=hold_mode,
+            burst_seconds=burst_seconds,
+            burst_jitter=burst_jitter,
+            ready_queue=ready_queue,
+        )
+        return
+    if normalized_backend == "driver":
+        run_driver_worker(
+            gpu_index=gpu_index,
+            memory_bytes=memory_bytes,
+            duty_cycle=duty_cycle,
+            program=program,
+            hold_mode=hold_mode,
+            burst_seconds=burst_seconds,
+            burst_jitter=burst_jitter,
+            ready_queue=ready_queue,
+        )
+        return
+    raise RuntimeError(f"unhandled worker backend: {normalized_backend}")
 
 
 def _put_ready_message(queue: mp.Queue[dict[str, Any]], message: dict[str, Any]) -> None:

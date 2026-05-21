@@ -51,13 +51,7 @@ class FakeCudaLibrary:
 
 def test_normalize_backend_only_accepts_worker_backends() -> None:
     assert normalize_backend(" torch ") == "torch"
-
-    try:
-        normalize_backend("driver")
-    except ValueError as exc:
-        assert "unsupported worker backend" in str(exc)
-    else:
-        raise AssertionError("driver must not be accepted as a worker backend yet")
+    assert normalize_backend(" DRIVER ") == "driver"
 
 
 def test_normalize_diagnostic_backend_accepts_driver() -> None:

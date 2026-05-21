@@ -36,7 +36,7 @@ These invariants are part of the project contract:
 - Keep read-only `nvidia-smi` collection and GPU snapshot parsing in `telemetry.py`.
 - Keep worker process startup, shutdown, and backend dispatch in `worker.py`.
 - Keep PyTorch-specific compute code in `torch_backend.py`.
-- Keep NVIDIA Driver API diagnostics and future Driver API worker code in `driver_backend.py`.
+- Keep NVIDIA Driver API diagnostics and worker code in `driver_backend.py`.
 - Keep backend names, validation, and health-check dispatch in `backends.py`.
 
 The policy layer should stay backend-neutral and should not import PyTorch, `ctypes`, or subprocess

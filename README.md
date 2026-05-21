@@ -4,7 +4,10 @@
 
 `gpu-holder` is a small NVIDIA GPU guard for shared training machines. It starts lightweight CUDA workers when selected GPUs fall below a per-GPU utilization floor, and it yields to real training or inference jobs without killing, suspending, or modifying external processes.
 
-The current worker backend uses optional PyTorch because it is widely available on training hosts. The project is structured so the scheduling policy is independent from the worker backend; a lighter NVIDIA Driver API backend can be added without rewriting the guard logic.
+The default worker backend uses optional PyTorch because it is widely available on training hosts.
+An experimental NVIDIA Driver API worker is also available for machines where installing PyTorch is
+unwanted. The scheduling policy is independent from worker backends, so either backend follows the
+same per-GPU safety rules.
 
 ## Why
 
@@ -47,6 +50,7 @@ gpu-holder doctor
 gpu-holder doctor --backend torch
 gpu-holder doctor --backend driver
 gpu-holder guard --gpus 0-7 --risk-util 0.6 --target-util 0.9 --mem 0.05 --backend torch
+gpu-holder guard --gpus 0-7 --risk-util 0.6 --target-util 0.9 --mem 0.05 --backend driver
 gpu-holder start --gpus 0-7 --risk-util 0.6 --target-util 0.9 --mem 0.05 --backend torch
 gpu-holder status
 gpu-holder dashboard
@@ -104,7 +108,7 @@ It refuses to stop a pidfile that does not point to a `gpu-holder` guard process
 src/gpu_holder/
   cli.py       # CLI, daemon lifecycle, status files, and guard orchestration
   backends.py  # backend selection and backend health checks
-  driver_backend.py # NVIDIA Driver API diagnostics
+  driver_backend.py # NVIDIA Driver API diagnostics and worker implementation
   models.py    # shared dataclasses for GPU snapshots, processes, and decisions
   policy.py    # per-GPU scheduling policy and memory sizing
   telemetry.py # read-only nvidia-smi collection and snapshot parsing
@@ -121,17 +125,17 @@ handoff rules testable and makes lighter backends easier to add.
 
 Base install has no third-party runtime dependency. It uses system `nvidia-smi` for read-only GPU status.
 
-The current compute worker needs CUDA-enabled PyTorch:
+The default compute worker needs CUDA-enabled PyTorch:
 
 ```bash
 python -m pip install -e ".[torch]"
 ```
 
-The current backend selector exposes `--backend torch`. The option is intentionally present before
-additional backends exist, so scripts can keep the same shape when the default backend changes.
+The backend selector exposes `--backend torch` and `--backend driver`. The `torch` backend remains
+the default. The `driver` backend uses `ctypes`, `libcuda.so.1`, and embedded PTX, so it does not
+require PyTorch, CUDA Toolkit, `nvcc`, CuPy, Numba, or local compilation.
 `gpu-holder doctor --backend driver` can already check whether `libcuda.so.1` and CUDA devices are
-visible through the NVIDIA Driver API, then JIT and launch a tiny embedded PTX kernel. The driver
-backend is diagnostic-only for now and is not yet accepted by `guard` or `start`.
+visible through the NVIDIA Driver API, then JIT and launch a tiny embedded PTX kernel.
 
 Planned backend direction:
 

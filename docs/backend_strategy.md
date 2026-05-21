@@ -20,22 +20,26 @@ The public backend selector currently supports:
 
 ```bash
 gpu-holder guard --backend torch
+gpu-holder guard --backend driver
 gpu-holder doctor --backend torch
 gpu-holder doctor --backend driver
 ```
 
-Keeping this selector explicit makes the future `driver` backend an additive implementation change
-instead of a CLI redesign.
+Keeping this selector explicit lets the default backend change later without a CLI redesign.
 
-The `driver` backend is diagnostic-only until the Driver API worker can run a real compute loop.
-It checks that `libcuda.so.1` can be loaded, `cuInit` succeeds, the driver version can be queried,
-at least one CUDA device is visible, and a tiny embedded PTX kernel can be JIT-compiled, launched,
-and synchronized.
+The `driver` backend is experimental but usable as a worker. Its diagnostic path checks that
+`libcuda.so.1` can be loaded, `cuInit` succeeds, the driver version can be queried, at least one
+CUDA device is visible, and a tiny embedded PTX kernel can be JIT-compiled, launched, and
+synchronized. Its worker path creates a Driver API context, optionally reserves memory with
+`cuMemAlloc`, and launches an embedded spin kernel according to the same duty-cycle controls used
+by the PyTorch backend. The Driver API worker intentionally uses one conservative spin kernel;
+`--program` choices such as `matmul`, `conv`, `fft`, and `elementwise` remain PyTorch-backend
+workload variants.
 
 The current code boundary is:
 
 - `backends.py`: backend names, validation, and health checks
-- `driver_backend.py`: NVIDIA Driver API diagnostics and future Driver API worker code
+- `driver_backend.py`: NVIDIA Driver API diagnostics and worker code
 - `telemetry.py`: read-only `nvidia-smi` collection and snapshot parsing
 - `worker.py`: process lifecycle, startup readiness, shutdown, and backend dispatch
 - `torch_backend.py`: PyTorch-specific CUDA memory and compute workload
@@ -43,7 +47,7 @@ The current code boundary is:
 
 ## Preferred Default Backend
 
-The preferred default backend is:
+The preferred eventual default backend is:
 
 ```text
 ctypes + libcuda.so.1 + embedded conservative PTX
@@ -109,7 +113,7 @@ A Driver API backend should follow these rules:
 Before making the Driver API backend the default, verify:
 
 - `gpu-holder doctor --backend driver` reports driver library, GPU count, and PTX smoke-test status
-- `gpu-holder guard --once` can start and stop one worker cleanly
+- `gpu-holder guard --backend driver --once` can start and stop one worker cleanly
 - foreground shutdown exits promptly with no lingering worker processes
 - `CUDA_VISIBLE_DEVICES` remapping is covered by tests or a documented manual check
 - the PyTorch fallback remains available for users who already rely on it

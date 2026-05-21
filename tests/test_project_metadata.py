@@ -129,8 +129,10 @@ def test_backend_strategy_documents_compatibility_boundary() -> None:
     assert "ctypes + libcuda.so.1 + embedded conservative PTX" in content
     assert "gpu-holder doctor --backend torch" in content
     assert "gpu-holder doctor --backend driver" in content
-    assert "diagnostic-only" in content
+    assert "gpu-holder guard --backend driver" in content
+    assert "experimental but usable as a worker" in content
     assert "tiny embedded PTX kernel can be JIT-compiled" in content
+    assert "Driver API worker intentionally uses one conservative spin kernel" in content
     assert "Works on Linux machines with an NVIDIA driver and accessible CUDA devices." in content
     assert 'It should not be documented as "works on every machine".' in content
     assert "CUDA_VISIBLE_DEVICES" in content
