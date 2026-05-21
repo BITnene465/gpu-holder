@@ -88,11 +88,13 @@ def test_repository_has_github_ready_safety_docs() -> None:
     manifest = (ROOT / "MANIFEST.in").read_text(encoding="utf-8")
     roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    development_log = (ROOT / "docs" / "development_log.md").read_text(encoding="utf-8")
 
     assert (ROOT / "CONTRIBUTING.md").exists()
     assert (ROOT / "MANIFEST.in").exists()
     assert (ROOT / "ROADMAP.md").exists()
     assert (ROOT / "SECURITY.md").exists()
+    assert (ROOT / "docs" / "development_log.md").exists()
     assert (ROOT / ".github" / "workflows" / "ci.yml").exists()
     assert (ROOT / ".github" / "pull_request_template.md").exists()
     assert "External CUDA processes are read-only scheduling signals." in contributing
@@ -103,6 +105,7 @@ def test_repository_has_github_ready_safety_docs() -> None:
     assert "worker_controls.py # backend-neutral duty cycle, jitter, and hold-mode controls" in readme
     assert "gpu-holder guard --gpus 0 --risk-util 0.6 --target-util 0.9 --mem 0 --backend driver --once" in contributing
     assert "ROADMAP.md" in readme
+    assert "docs/development_log.md" in readme
     assert "avoid PyTorch and use the experimental Driver API backend" in readme
     assert "Near-Term Priorities" in roadmap
     assert "Non-Goals" in roadmap
@@ -113,6 +116,9 @@ def test_repository_has_github_ready_safety_docs() -> None:
     assert "Managing, killing, suspending, renicing" in roadmap
     assert "include ROADMAP.md" in manifest
     assert "recursive-include docs *.md" in manifest
+    assert "Driver backend compatibility boundary" in development_log
+    assert "Linux machines with an NVIDIA driver and accessible CUDA devices" in development_log
+    assert "worker_controls.py" in development_log
 
 
 def test_github_templates_are_english_and_safety_focused() -> None:

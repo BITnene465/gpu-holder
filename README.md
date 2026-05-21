@@ -158,6 +158,8 @@ See [docs/backend_strategy.md](docs/backend_strategy.md) for the compatibility b
 acceptance criteria before switching the default backend.
 
 See [ROADMAP.md](ROADMAP.md) for current scope, near-term priorities, and explicit non-goals.
+See [docs/development_log.md](docs/development_log.md) for recurring project decisions and
+regression notes.
 
 ## Development
 
