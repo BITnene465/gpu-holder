@@ -84,8 +84,13 @@ def test_readme_does_not_document_deleted_features() -> None:
 
 def test_repository_has_github_ready_safety_docs() -> None:
     contributing = (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8")
+    manifest = (ROOT / "MANIFEST.in").read_text(encoding="utf-8")
+    roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
     assert (ROOT / "CONTRIBUTING.md").exists()
+    assert (ROOT / "MANIFEST.in").exists()
+    assert (ROOT / "ROADMAP.md").exists()
     assert (ROOT / "SECURITY.md").exists()
     assert (ROOT / ".github" / "workflows" / "ci.yml").exists()
     assert (ROOT / ".github" / "pull_request_template.md").exists()
@@ -93,6 +98,15 @@ def test_repository_has_github_ready_safety_docs() -> None:
     assert "policy.py" in contributing
     assert "driver_backend.py" in contributing
     assert "telemetry.py" in contributing
+    assert "ROADMAP.md" in readme
+    assert "Near-Term Priorities" in roadmap
+    assert "Non-Goals" in roadmap
+    assert "Compatibility Reality" in roadmap
+    assert "It is not a promise that every machine can run it." in roadmap
+    assert "ctypes + libcuda.so.1 + embedded conservative PTX" in roadmap
+    assert "Managing, killing, suspending, renicing" in roadmap
+    assert "include ROADMAP.md" in manifest
+    assert "recursive-include docs *.md" in manifest
 
 
 def test_github_templates_are_english_and_safety_focused() -> None:

@@ -42,6 +42,9 @@ These invariants are part of the project contract:
 The policy layer should stay backend-neutral and should not import PyTorch, `ctypes`, or subprocess
 worker implementations.
 
+See [ROADMAP.md](ROADMAP.md) before expanding scope. New features should preserve the project
+non-goals and safety boundary.
+
 ## Testing Guidance
 
 Use unit tests for policy, parsing, status payloads, backend validation, and worker lifecycle.

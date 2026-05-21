@@ -102,7 +102,7 @@ It refuses to stop a pidfile that does not point to a `gpu-holder` guard process
 
 ```text
 src/gpu_holder/
-  cli.py       # CLI, daemon lifecycle, nvidia-smi snapshots, status output
+  cli.py       # CLI, daemon lifecycle, status files, and guard orchestration
   backends.py  # backend selection and backend health checks
   driver_backend.py # NVIDIA Driver API diagnostics
   models.py    # shared dataclasses for GPU snapshots, processes, and decisions
@@ -143,6 +143,8 @@ This should be described as "works on machines with NVIDIA driver and accessible
 
 See [docs/backend_strategy.md](docs/backend_strategy.md) for the compatibility boundary and
 acceptance criteria before switching the default backend.
+
+See [ROADMAP.md](ROADMAP.md) for current scope, near-term priorities, and explicit non-goals.
 
 ## Development
 
