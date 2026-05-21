@@ -36,6 +36,7 @@ def test_source_tree_is_trimmed_to_cli_and_worker() -> None:
         "driver_backend.py",
         "models.py",
         "policy.py",
+        "telemetry.py",
         "torch_backend.py",
         "worker.py",
     }
@@ -91,6 +92,7 @@ def test_repository_has_github_ready_safety_docs() -> None:
     assert "External CUDA processes are read-only scheduling signals." in contributing
     assert "policy.py" in contributing
     assert "driver_backend.py" in contributing
+    assert "telemetry.py" in contributing
 
 
 def test_github_templates_are_english_and_safety_focused() -> None:

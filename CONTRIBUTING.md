@@ -32,7 +32,8 @@ These invariants are part of the project contract:
 ## Architecture Rules
 
 - Keep per-GPU scheduling decisions in `policy.py`.
-- Keep CLI, daemon lifecycle, status files, and `nvidia-smi` snapshots in `cli.py`.
+- Keep CLI, daemon lifecycle, and status files in `cli.py`.
+- Keep read-only `nvidia-smi` collection and GPU snapshot parsing in `telemetry.py`.
 - Keep worker process startup, shutdown, and backend dispatch in `worker.py`.
 - Keep PyTorch-specific compute code in `torch_backend.py`.
 - Keep NVIDIA Driver API diagnostics and future Driver API worker code in `driver_backend.py`.
@@ -55,4 +56,3 @@ gpu-holder guard --gpus 0 --risk-util 0.6 --target-util 0.9 --mem 0.05 --backend
 ```
 
 Include the commands you ran in the pull request.
-

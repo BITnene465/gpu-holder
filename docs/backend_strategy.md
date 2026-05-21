@@ -35,6 +35,7 @@ The current code boundary is:
 
 - `backends.py`: backend names, validation, and health checks
 - `driver_backend.py`: NVIDIA Driver API diagnostics and future Driver API worker code
+- `telemetry.py`: read-only `nvidia-smi` collection and snapshot parsing
 - `worker.py`: process lifecycle, startup readiness, shutdown, and backend dispatch
 - `torch_backend.py`: PyTorch-specific CUDA memory and compute workload
 - `policy.py`: backend-neutral per-GPU scheduling decisions

@@ -480,7 +480,7 @@ def test_guard_apply_stops_for_training_and_restarts_after_training(monkeypatch,
 
 
 def test_guard_dry_run_prints_decisions_without_state_or_workers(monkeypatch, tmp_path, capsys) -> None:
-    def fake_read_snapshots(config: Config, workers: dict[int, object]) -> list[GpuSnapshot]:
+    def fake_read_snapshots(workers: dict[int, object]) -> list[GpuSnapshot]:
         assert workers == {}
         return [
             GpuSnapshot(
@@ -516,9 +516,9 @@ def test_guard_dry_run_prints_decisions_without_state_or_workers(monkeypatch, tm
 def test_guard_once_runs_one_iteration_and_cleans_pidfile(monkeypatch, tmp_path) -> None:
     calls = 0
 
-    def fake_read_snapshots(config: Config, workers: dict[int, object]) -> list[GpuSnapshot]:
+    def fake_read_snapshots(workers: dict[int, object]) -> list[GpuSnapshot]:
         nonlocal calls
-        del config, workers
+        del workers
         calls += 1
         return [
             GpuSnapshot(

@@ -107,14 +107,15 @@ src/gpu_holder/
   driver_backend.py # NVIDIA Driver API diagnostics
   models.py    # shared dataclasses for GPU snapshots, processes, and decisions
   policy.py    # per-GPU scheduling policy and memory sizing
+  telemetry.py # read-only nvidia-smi collection and snapshot parsing
   worker.py    # worker process lifecycle and backend dispatch
   torch_backend.py # PyTorch CUDA worker implementation
   __main__.py
 ```
 
-The policy layer has no subprocess or PyTorch dependency. The worker lifecycle is also separate from
-the PyTorch backend implementation, so adding a lighter backend does not require rewriting the guard
-logic.
+The policy layer has no subprocess or PyTorch dependency. GPU telemetry is isolated from the CLI
+and scheduler, and the worker lifecycle is separate from backend implementations. This keeps the
+handoff rules testable and makes lighter backends easier to add.
 
 ## Dependency Strategy
 
