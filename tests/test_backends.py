@@ -27,12 +27,26 @@ class FakeCudaLibrary:
         init_result: int = 0,
         driver_version_result: int = 0,
         device_count_result: int = 0,
+        device_get_result: int = 0,
+        ctx_create_result: int = 0,
+        module_load_result: int = 0,
+        module_get_function_result: int = 0,
+        launch_kernel_result: int = 0,
+        ctx_synchronize_result: int = 0,
         driver_version: int = 12040,
         device_count: int = 8,
     ) -> None:
         self.cuInit = FakeCudaFunction(init_result)
         self.cuDriverGetVersion = FakeCudaFunction(driver_version_result, driver_version)
         self.cuDeviceGetCount = FakeCudaFunction(device_count_result, device_count)
+        self.cuDeviceGet = FakeCudaFunction(device_get_result, 0)
+        self.cuCtxCreate_v2 = FakeCudaFunction(ctx_create_result, 1)
+        self.cuCtxDestroy_v2 = FakeCudaFunction()
+        self.cuModuleLoadData = FakeCudaFunction(module_load_result, 2)
+        self.cuModuleUnload = FakeCudaFunction()
+        self.cuModuleGetFunction = FakeCudaFunction(module_get_function_result, 3)
+        self.cuLaunchKernel = FakeCudaFunction(launch_kernel_result)
+        self.cuCtxSynchronize = FakeCudaFunction(ctx_synchronize_result)
 
 
 def test_normalize_backend_only_accepts_worker_backends() -> None:
@@ -61,6 +75,7 @@ def test_driver_cuda_check_reports_driver_version_and_device_count() -> None:
     assert "library=libcuda.so.1" in check.detail
     assert "driver_version=12040" in check.detail
     assert "device_count=8" in check.detail
+    assert "ptx_smoke=ok" in check.detail
 
 
 def test_driver_cuda_check_fails_when_library_cannot_load() -> None:
@@ -91,3 +106,14 @@ def test_driver_cuda_check_reports_driver_api_error_codes() -> None:
 
     assert check.ok is False
     assert check.detail == "cuInit_failed code=100"
+
+
+def test_driver_cuda_check_reports_ptx_smoke_failures() -> None:
+    check = check_driver_cuda(
+        load_library=lambda name: FakeCudaLibrary(module_load_result=209),
+        library_name="libcuda.so.1",
+    )
+
+    assert check.ok is False
+    assert "device_count=8" in check.detail
+    assert "ptx_smoke=cuModuleLoadData_failed code=209" in check.detail

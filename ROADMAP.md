@@ -9,18 +9,18 @@ small, auditable guard for idle GPU utilization.
 - Per-GPU scheduling policy based on utilization, memory, and external CUDA processes.
 - Startup grace window for large external training or inference jobs.
 - PyTorch worker backend for real CUDA utilization.
-- NVIDIA Driver API diagnostics through `gpu-holder doctor --backend driver`.
+- NVIDIA Driver API diagnostics with embedded PTX smoke through
+  `gpu-holder doctor --backend driver`.
 - Read-only `nvidia-smi` telemetry.
 - No third-party runtime dependency for status, policy, and diagnostics.
 
 ## Near-Term Priorities
 
 1. Implement a Driver API worker backend using `ctypes + libcuda.so.1 + embedded conservative PTX`.
-2. Add a Driver API PTX smoke test to `gpu-holder doctor --backend driver`.
-3. Preserve `--backend torch` as a fallback for environments that already depend on PyTorch.
-4. Improve `CUDA_VISIBLE_DEVICES`, physical GPU index, and GPU UUID handling before making the
+2. Preserve `--backend torch` as a fallback for environments that already depend on PyTorch.
+3. Improve `CUDA_VISIBLE_DEVICES`, physical GPU index, and GPU UUID handling before making the
    Driver API backend the default.
-5. Keep default tests GPU-free while documenting explicit manual CUDA smoke checks.
+4. Keep default tests GPU-free while documenting explicit manual CUDA smoke checks.
 
 ## Compatibility Reality
 

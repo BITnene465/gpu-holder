@@ -103,6 +103,7 @@ def test_repository_has_github_ready_safety_docs() -> None:
     assert "Non-Goals" in roadmap
     assert "Compatibility Reality" in roadmap
     assert "It is not a promise that every machine can run it." in roadmap
+    assert "embedded PTX smoke" in roadmap
     assert "ctypes + libcuda.so.1 + embedded conservative PTX" in roadmap
     assert "Managing, killing, suspending, renicing" in roadmap
     assert "include ROADMAP.md" in manifest
@@ -129,6 +130,7 @@ def test_backend_strategy_documents_compatibility_boundary() -> None:
     assert "gpu-holder doctor --backend torch" in content
     assert "gpu-holder doctor --backend driver" in content
     assert "diagnostic-only" in content
+    assert "tiny embedded PTX kernel can be JIT-compiled" in content
     assert "Works on Linux machines with an NVIDIA driver and accessible CUDA devices." in content
     assert 'It should not be documented as "works on every machine".' in content
     assert "CUDA_VISIBLE_DEVICES" in content

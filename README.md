@@ -130,8 +130,8 @@ python -m pip install -e ".[torch]"
 The current backend selector exposes `--backend torch`. The option is intentionally present before
 additional backends exist, so scripts can keep the same shape when the default backend changes.
 `gpu-holder doctor --backend driver` can already check whether `libcuda.so.1` and CUDA devices are
-visible through the NVIDIA Driver API. The driver backend is diagnostic-only for now and is not yet
-accepted by `guard` or `start`.
+visible through the NVIDIA Driver API, then JIT and launch a tiny embedded PTX kernel. The driver
+backend is diagnostic-only for now and is not yet accepted by `guard` or `start`.
 
 Planned backend direction:
 

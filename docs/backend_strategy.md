@@ -29,7 +29,8 @@ instead of a CLI redesign.
 
 The `driver` backend is diagnostic-only until the Driver API worker can run a real compute loop.
 It checks that `libcuda.so.1` can be loaded, `cuInit` succeeds, the driver version can be queried,
-and at least one CUDA device is visible.
+at least one CUDA device is visible, and a tiny embedded PTX kernel can be JIT-compiled, launched,
+and synchronized.
 
 The current code boundary is:
 
@@ -93,7 +94,7 @@ A Driver API backend should follow these rules:
 1. Load `libcuda.so.1` first. Do not depend on the development symlink `libcuda.so`.
 2. Treat `CUDA_VISIBLE_DEVICES`, physical indexes, and GPU UUIDs carefully. Do not assume logical
    index `0` always means physical GPU `0`.
-3. Run a startup smoke test before claiming the backend is usable:
+3. Keep the startup smoke test green before claiming the backend is usable:
    - initialize the driver
    - enumerate devices
    - create a context on one selected GPU
@@ -107,7 +108,7 @@ A Driver API backend should follow these rules:
 
 Before making the Driver API backend the default, verify:
 
-- `gpu-holder doctor` reports driver library, GPU count, and PTX smoke-test status
+- `gpu-holder doctor --backend driver` reports driver library, GPU count, and PTX smoke-test status
 - `gpu-holder guard --once` can start and stop one worker cleanly
 - foreground shutdown exits promptly with no lingering worker processes
 - `CUDA_VISIBLE_DEVICES` remapping is covered by tests or a documented manual check
