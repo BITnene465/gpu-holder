@@ -72,3 +72,14 @@ def test_repository_has_github_ready_safety_docs() -> None:
     assert (ROOT / "SECURITY.md").exists()
     assert (ROOT / ".github" / "workflows" / "ci.yml").exists()
     assert (ROOT / ".github" / "pull_request_template.md").exists()
+
+
+def test_backend_strategy_documents_compatibility_boundary() -> None:
+    content = (ROOT / "docs" / "backend_strategy.md").read_text(encoding="utf-8")
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "ctypes + libcuda.so.1 + embedded conservative PTX" in content
+    assert "Works on Linux machines with an NVIDIA driver and accessible CUDA devices." in content
+    assert 'It should not be documented as "works on every machine".' in content
+    assert "CUDA_VISIBLE_DEVICES" in content
+    assert "docs/backend_strategy.md" in readme

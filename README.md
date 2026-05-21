@@ -127,6 +127,9 @@ Planned backend direction:
 
 This should be described as "works on machines with NVIDIA driver and accessible CUDA devices", not "works on every machine".
 
+See [docs/backend_strategy.md](docs/backend_strategy.md) for the compatibility boundary and
+acceptance criteria before switching the default backend.
+
 ## Development
 
 ```bash
