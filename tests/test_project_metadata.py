@@ -35,6 +35,7 @@ def test_source_tree_is_trimmed_to_cli_and_worker() -> None:
         "cli.py",
         "models.py",
         "policy.py",
+        "torch_backend.py",
         "worker.py",
     }
 

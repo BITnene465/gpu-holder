@@ -2,17 +2,20 @@ from __future__ import annotations
 
 import pytest
 
+import gpu_holder.torch_backend as torch_backend_mod
 import gpu_holder.worker as worker_mod
-from gpu_holder.worker import (
+from gpu_holder.torch_backend import (
     MATMUL_SIZE,
-    WorkerProcess,
-    WorkerStartError,
     _PROGRAM_CACHE,
     _jittered_burst_seconds,
     _next_program,
     _program_sequence,
     _run_program,
     _sleep_seconds_for_duty,
+)
+from gpu_holder.worker import (
+    WorkerProcess,
+    WorkerStartError,
     _worker_main,
 )
 
@@ -226,7 +229,7 @@ def test_worker_main_dispatches_to_torch_backend(monkeypatch) -> None:
     def fake_torch_worker_main(**kwargs: object) -> None:
         calls.append(kwargs)
 
-    monkeypatch.setattr(worker_mod, "_torch_worker_main", fake_torch_worker_main)
+    monkeypatch.setattr(worker_mod, "run_torch_worker", fake_torch_worker_main)
 
     _worker_main(
         gpu_index=0,
@@ -252,3 +255,7 @@ def test_worker_main_dispatches_to_torch_backend(monkeypatch) -> None:
             "ready_queue": ready_queue,
         }
     ]
+
+
+def test_torch_backend_owns_program_implementation() -> None:
+    assert torch_backend_mod.BASE_PROGRAMS == ("matmul", "conv", "fft", "elementwise")

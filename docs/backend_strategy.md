@@ -26,6 +26,13 @@ gpu-holder doctor --backend torch
 Keeping this selector explicit makes the future `driver` backend an additive implementation change
 instead of a CLI redesign.
 
+The current code boundary is:
+
+- `backends.py`: backend names, validation, and health checks
+- `worker.py`: process lifecycle, startup readiness, shutdown, and backend dispatch
+- `torch_backend.py`: PyTorch-specific CUDA memory and compute workload
+- `policy.py`: backend-neutral per-GPU scheduling decisions
+
 ## Preferred Default Backend
 
 The preferred default backend is:

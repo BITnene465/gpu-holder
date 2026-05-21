@@ -105,11 +105,14 @@ src/gpu_holder/
   backends.py  # backend selection and backend health checks
   models.py    # shared dataclasses for GPU snapshots, processes, and decisions
   policy.py    # per-GPU scheduling policy and memory sizing
-  worker.py    # CUDA worker implementation
+  worker.py    # worker process lifecycle and backend dispatch
+  torch_backend.py # PyTorch CUDA worker implementation
   __main__.py
 ```
 
-The policy layer has no subprocess or PyTorch dependency. This keeps the training handoff rules testable and makes it possible to add a lighter worker backend later.
+The policy layer has no subprocess or PyTorch dependency. The worker lifecycle is also separate from
+the PyTorch backend implementation, so adding a lighter backend does not require rewriting the guard
+logic.
 
 ## Dependency Strategy
 
