@@ -12,6 +12,10 @@ import threading
 import time
 
 from . import __version__
+from .backends import DEFAULT_BACKEND
+from .backends import SUPPORTED_BACKENDS
+from .backends import check_backend
+from .backends import normalize_backend
 from .models import Decision, GpuProcess, GpuSnapshot
 from .policy import decide
 from .policy import make_hold
@@ -51,6 +55,7 @@ class Config:
     busy_process_mem_threshold: str = "10GiB"
     assist_mem: str = "512MiB"
     sample_interval: float = 2.0
+    backend: str = DEFAULT_BACKEND
     program: str = "matmul"
     min_duty_cycle: float = 0.0
     max_duty_cycle: float = 1.0
@@ -111,8 +116,9 @@ def build_parser() -> argparse.ArgumentParser:
     status.add_argument("--check", action="store_true")
     dashboard = sub.add_parser("dashboard", help="print compact status snapshot")
     dashboard.add_argument("--state-dir", default=str(STATE_DIR))
-    doctor = sub.add_parser("doctor", help="check nvidia-smi and PyTorch CUDA")
+    doctor = sub.add_parser("doctor", help="check nvidia-smi and worker backend")
     doctor.add_argument("--json", action="store_true")
+    doctor.add_argument("--backend", default=DEFAULT_BACKEND, choices=SUPPORTED_BACKENDS)
     return parser
 
 
@@ -147,6 +153,12 @@ def add_run_args(parser: argparse.ArgumentParser, *, include_controls: bool = Fa
     parser.add_argument("--busy-process-mem-threshold", default="10GiB")
     parser.add_argument("--assist-mem", default="512MiB")
     parser.add_argument("--sample-interval", type=float, default=2.0)
+    parser.add_argument(
+        "--backend",
+        default=DEFAULT_BACKEND,
+        choices=SUPPORTED_BACKENDS,
+        help="worker backend to use",
+    )
     parser.add_argument("--program", default="matmul")
     parser.add_argument("--min-duty-cycle", type=float, default=0.0)
     parser.add_argument("--max-duty-cycle", type=float, default=1.0)
@@ -264,7 +276,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     checks = [
         {"name": "python", "ok": sys.version_info[:2] == (3, 10), "detail": sys.version.split()[0]},
         check_nvidia_smi(),
-        check_torch_cuda(),
+        check_backend(args.backend).as_payload(),
     ]
     payload = {"ok": all(item["ok"] for item in checks), "checks": checks}
     if args.json:
@@ -378,6 +390,7 @@ class Guard:
             duty_cycle=decision.duty_cycle,
             program=self.config.program,
             hold_mode=decision.hold_mode,
+            backend=self.config.backend,
             burst_seconds=self.config.compute_burst_seconds,
             burst_jitter=self.config.compute_burst_jitter,
         )
@@ -505,6 +518,7 @@ def status_payload(
             "target_util": config.target_util,
             "risk_util": config.risk_util,
             "mem": config.mem,
+            "backend": config.backend,
             "program": config.program,
             "sample_interval": config.sample_interval,
             "process_grace_window": config.process_grace_window,
@@ -542,6 +556,7 @@ def worker_payload(worker: WorkerProcess | None) -> dict[str, object] | None:
         "memory_bytes": worker.memory_bytes,
         "memory_human": human_bytes(worker.memory_bytes),
         "program": worker.program,
+        "backend": worker.backend,
         "duty_cycle": worker.duty_cycle,
     }
 
@@ -603,19 +618,6 @@ def check_nvidia_smi() -> dict[str, object]:
     return {"name": "nvidia-smi", "ok": count > 0, "detail": f"gpu_count={count}"}
 
 
-def check_torch_cuda() -> dict[str, object]:
-    try:
-        import torch
-    except Exception as exc:
-        return {"name": "torch", "ok": False, "detail": f"{type(exc).__name__}: {exc}"}
-    ok = bool(torch.cuda.is_available())
-    return {
-        "name": "torch_cuda",
-        "ok": ok,
-        "detail": f"torch={torch.__version__} cuda_available={ok} device_count={torch.cuda.device_count() if ok else 0}",
-    }
-
-
 def validate_config(config: Config) -> str | None:
     if config.sample_interval <= 0:
         return "--sample-interval must be positive"
@@ -633,6 +635,7 @@ def validate_config(config: Config) -> str | None:
         parse_bytes(config.reserve)
         parse_bytes(config.busy_process_mem_threshold)
         parse_bytes(config.assist_mem)
+        normalize_backend(config.backend)
     except ValueError as exc:
         return str(exc)
     programs = [part.strip().lower() for part in config.program.split(",")]
@@ -651,6 +654,7 @@ def config_from_args(args: argparse.Namespace) -> Config:
         busy_process_mem_threshold=args.busy_process_mem_threshold,
         assist_mem=args.assist_mem,
         sample_interval=args.sample_interval,
+        backend=args.backend,
         program=args.program,
         min_duty_cycle=args.min_duty_cycle,
         max_duty_cycle=args.max_duty_cycle,
@@ -674,6 +678,7 @@ def child_args(config: Config) -> list[str]:
         "--busy-process-mem-threshold", config.busy_process_mem_threshold,
         "--assist-mem", config.assist_mem,
         "--sample-interval", str(config.sample_interval),
+        "--backend", config.backend,
         "--program", config.program,
         "--min-duty-cycle", str(config.min_duty_cycle),
         "--max-duty-cycle", str(config.max_duty_cycle),

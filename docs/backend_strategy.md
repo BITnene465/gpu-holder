@@ -16,6 +16,16 @@ the current compute worker:
 python -m pip install -e ".[torch]"
 ```
 
+The public backend selector currently supports:
+
+```bash
+gpu-holder guard --backend torch
+gpu-holder doctor --backend torch
+```
+
+Keeping this selector explicit makes the future `driver` backend an additive implementation change
+instead of a CLI redesign.
+
 ## Preferred Default Backend
 
 The preferred default backend is:
@@ -88,4 +98,3 @@ Before making the Driver API backend the default, verify:
 - foreground shutdown exits promptly with no lingering worker processes
 - `CUDA_VISIBLE_DEVICES` remapping is covered by tests or a documented manual check
 - the PyTorch fallback remains available for users who already rely on it
-

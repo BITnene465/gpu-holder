@@ -13,6 +13,7 @@ from gpu_holder.worker import (
     _program_sequence,
     _run_program,
     _sleep_seconds_for_duty,
+    _worker_main,
 )
 
 
@@ -204,3 +205,50 @@ def test_worker_stop_kills_process_after_short_terminate_timeout() -> None:
     assert process.killed is True
     assert process.join_timeouts == [0.2, 0.5]
     assert worker.process is None
+
+
+def test_worker_rejects_unknown_backend() -> None:
+    with pytest.raises(ValueError, match="unsupported backend"):
+        WorkerProcess(
+            gpu_index=0,
+            memory_bytes=0,
+            duty_cycle=1.0,
+            program="matmul",
+            hold_mode="compute-only",
+            backend="unknown",
+        )
+
+
+def test_worker_main_dispatches_to_torch_backend(monkeypatch) -> None:
+    calls: list[dict[str, object]] = []
+    ready_queue = object()
+
+    def fake_torch_worker_main(**kwargs: object) -> None:
+        calls.append(kwargs)
+
+    monkeypatch.setattr(worker_mod, "_torch_worker_main", fake_torch_worker_main)
+
+    _worker_main(
+        gpu_index=0,
+        memory_bytes=0,
+        duty_cycle=1.0,
+        program="matmul",
+        hold_mode="compute-only",
+        backend="torch",
+        burst_seconds=0.2,
+        burst_jitter=0.0,
+        ready_queue=ready_queue,
+    )
+
+    assert calls == [
+        {
+            "gpu_index": 0,
+            "memory_bytes": 0,
+            "duty_cycle": 1.0,
+            "program": "matmul",
+            "hold_mode": "compute-only",
+            "burst_seconds": 0.2,
+            "burst_jitter": 0.0,
+            "ready_queue": ready_queue,
+        }
+    ]

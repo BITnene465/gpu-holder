@@ -8,6 +8,10 @@ import time
 from typing import Any
 from typing import Callable
 
+from .backends import DEFAULT_BACKEND
+from .backends import normalize_backend
+from .backends import require_torch
+
 
 BASE_PROGRAMS = ("matmul", "conv", "fft", "elementwise")
 MATMUL_SIZE = 8192
@@ -27,6 +31,7 @@ class WorkerProcess:
         duty_cycle: float,
         program: str,
         hold_mode: str,
+        backend: str = DEFAULT_BACKEND,
         burst_seconds: float = 0.20,
         burst_jitter: float = 0.0,
     ) -> None:
@@ -35,6 +40,7 @@ class WorkerProcess:
         self.duty_cycle = float(duty_cycle)
         self.program = str(program)
         self.hold_mode = str(hold_mode)
+        self.backend = normalize_backend(backend)
         self.burst_seconds = float(burst_seconds)
         self.burst_jitter = float(burst_jitter)
         self.process: mp.Process | None = None
@@ -66,6 +72,7 @@ class WorkerProcess:
                 "duty_cycle": self.duty_cycle,
                 "program": self.program,
                 "hold_mode": self.hold_mode,
+                "backend": self.backend,
                 "burst_seconds": self.burst_seconds,
                 "burst_jitter": self.burst_jitter,
                 "ready_queue": ready_queue,
@@ -114,6 +121,7 @@ def _worker_entry(
     duty_cycle: float,
     program: str,
     hold_mode: str,
+    backend: str,
     burst_seconds: float,
     burst_jitter: float,
     ready_queue: mp.Queue[dict[str, Any]],
@@ -125,6 +133,7 @@ def _worker_entry(
             duty_cycle=duty_cycle,
             program=program,
             hold_mode=hold_mode,
+            backend=backend,
             burst_seconds=burst_seconds,
             burst_jitter=burst_jitter,
             ready_queue=ready_queue,
@@ -141,18 +150,38 @@ def _worker_main(
     duty_cycle: float,
     program: str,
     hold_mode: str,
+    backend: str,
     burst_seconds: float,
     burst_jitter: float,
     ready_queue: mp.Queue[dict[str, Any]],
 ) -> None:
-    try:
-        import torch
-    except ImportError as exc:
-        raise RuntimeError(
-            "GPU workers require PyTorch. Install a CUDA-enabled torch build for this machine "
-            "or use: pip install 'gpu-holder[torch]'"
-        ) from exc
+    normalized_backend = normalize_backend(backend)
+    if normalized_backend != "torch":
+        raise RuntimeError(f"unhandled worker backend: {normalized_backend}")
+    _torch_worker_main(
+        gpu_index=gpu_index,
+        memory_bytes=memory_bytes,
+        duty_cycle=duty_cycle,
+        program=program,
+        hold_mode=hold_mode,
+        burst_seconds=burst_seconds,
+        burst_jitter=burst_jitter,
+        ready_queue=ready_queue,
+    )
 
+
+def _torch_worker_main(
+    *,
+    gpu_index: int,
+    memory_bytes: int,
+    duty_cycle: float,
+    program: str,
+    hold_mode: str,
+    burst_seconds: float,
+    burst_jitter: float,
+    ready_queue: mp.Queue[dict[str, Any]],
+) -> None:
+    torch = require_torch()
     torch.cuda.set_device(int(gpu_index))
     mode = _normalize_hold_mode(hold_mode)
     allocate_bytes = 0 if mode == "compute-only" else max(0, int(memory_bytes))

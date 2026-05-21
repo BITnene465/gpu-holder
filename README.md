@@ -35,7 +35,7 @@ python -m pip install -e ".[torch]"
 Run a foreground guard on 8 GPUs:
 
 ```bash
-gpu-holder guard --gpus 0-7 --risk-util 0.6 --target-util 0.9 --mem 0.05
+gpu-holder guard --gpus 0-7 --risk-util 0.6 --target-util 0.9 --mem 0.05 --backend torch
 ```
 
 Stop a foreground guard with `Ctrl+C`.
@@ -44,8 +44,9 @@ Stop a foreground guard with `Ctrl+C`.
 
 ```bash
 gpu-holder doctor
-gpu-holder guard --gpus 0-7 --risk-util 0.6 --target-util 0.9 --mem 0.05
-gpu-holder start --gpus 0-7 --risk-util 0.6 --target-util 0.9 --mem 0.05
+gpu-holder doctor --backend torch
+gpu-holder guard --gpus 0-7 --risk-util 0.6 --target-util 0.9 --mem 0.05 --backend torch
+gpu-holder start --gpus 0-7 --risk-util 0.6 --target-util 0.9 --mem 0.05 --backend torch
 gpu-holder status
 gpu-holder dashboard
 gpu-holder stop
@@ -101,6 +102,7 @@ It refuses to stop a pidfile that does not point to a `gpu-holder` guard process
 ```text
 src/gpu_holder/
   cli.py       # CLI, daemon lifecycle, nvidia-smi snapshots, status output
+  backends.py  # backend selection and backend health checks
   models.py    # shared dataclasses for GPU snapshots, processes, and decisions
   policy.py    # per-GPU scheduling policy and memory sizing
   worker.py    # CUDA worker implementation
@@ -118,6 +120,9 @@ The current compute worker needs CUDA-enabled PyTorch:
 ```bash
 python -m pip install -e ".[torch]"
 ```
+
+The current backend selector exposes `--backend torch`. The option is intentionally present before
+additional backends exist, so scripts can keep the same shape when the default backend changes.
 
 Planned backend direction:
 

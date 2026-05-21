@@ -28,7 +28,15 @@ def test_source_tree_is_trimmed_to_cli_and_worker() -> None:
         for path in (ROOT / "src" / "gpu_holder").glob("*.py")
     }
 
-    assert files == {"__init__.py", "__main__.py", "cli.py", "models.py", "policy.py", "worker.py"}
+    assert files == {
+        "__init__.py",
+        "__main__.py",
+        "backends.py",
+        "cli.py",
+        "models.py",
+        "policy.py",
+        "worker.py",
+    }
 
 
 def test_parser_only_exposes_current_commands() -> None:
@@ -51,7 +59,10 @@ def test_parser_only_exposes_current_commands() -> None:
 def test_readme_does_not_document_deleted_features() -> None:
     content = (ROOT / "README.md").read_text(encoding="utf-8").lower()
 
-    assert "gpu-holder guard --gpus 0-7 --risk-util 0.6 --target-util 0.9 --mem 0.05" in content
+    assert (
+        "gpu-holder guard --gpus 0-7 --risk-util 0.6 "
+        "--target-util 0.9 --mem 0.05 --backend torch"
+    ) in content
     for deleted_feature in [
         "plan --fake",
         "preflight",
@@ -79,6 +90,7 @@ def test_backend_strategy_documents_compatibility_boundary() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
     assert "ctypes + libcuda.so.1 + embedded conservative PTX" in content
+    assert "gpu-holder doctor --backend torch" in content
     assert "Works on Linux machines with an NVIDIA driver and accessible CUDA devices." in content
     assert 'It should not be documented as "works on every machine".' in content
     assert "CUDA_VISIBLE_DEVICES" in content

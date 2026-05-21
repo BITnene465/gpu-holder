@@ -17,6 +17,7 @@ from gpu_holder.cli import (
     parse_ratio,
     resolve_memory_ratio,
     process_signature,
+    status_payload,
 )
 
 
@@ -33,6 +34,7 @@ def test_child_args_emit_normalized_ratio_values() -> None:
         target_util=parse_ratio("75%"),
         risk_util=parse_ratio("50%"),
         mem=parse_ratio("20%"),
+        backend="torch",
     )
     args = child_args(config)
 
@@ -40,6 +42,7 @@ def test_child_args_emit_normalized_ratio_values() -> None:
     assert args[args.index("--target-util") + 1] == "0.75"
     assert args[args.index("--risk-util") + 1] == "0.5"
     assert args[args.index("--mem") + 1] == "0.2"
+    assert args[args.index("--backend") + 1] == "torch"
 
 
 def test_guard_parser_defaults_use_short_target_duty_cycle() -> None:
@@ -47,10 +50,38 @@ def test_guard_parser_defaults_use_short_target_duty_cycle() -> None:
     config = config_from_args(args)
 
     assert config.target_util == 0.9
+    assert config.backend == "torch"
     assert config.min_duty_cycle == 0.0
     assert config.max_duty_cycle == 1.0
     assert config.compute_burst_seconds == 0.2
     assert config.process_grace_window == 120.0
+
+
+def test_guard_parser_exposes_worker_backend() -> None:
+    args = build_parser().parse_args(["guard", "--backend", "torch"])
+    config = config_from_args(args)
+
+    assert config.backend == "torch"
+
+
+def test_status_payload_reports_selected_backend() -> None:
+    config = Config(backend="torch")
+    gpu = GpuSnapshot(
+        index=0,
+        uuid="gpu-0",
+        name="GPU 0",
+        utilization=90,
+        memory_total=80 * 1024**3,
+        memory_used=1 * 1024**3,
+        memory_free=79 * 1024**3,
+        temperature=None,
+        processes=[],
+    )
+    decision = make_release(gpu, "risk_clear")
+
+    payload = status_payload([gpu], [decision], {}, config)
+
+    assert payload["config"]["backend"] == "torch"
 
 
 def test_gpu_option_accepts_ranges_and_mixed_lists() -> None:
