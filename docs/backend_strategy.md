@@ -21,10 +21,15 @@ The public backend selector currently supports:
 ```bash
 gpu-holder guard --backend torch
 gpu-holder doctor --backend torch
+gpu-holder doctor --backend driver
 ```
 
 Keeping this selector explicit makes the future `driver` backend an additive implementation change
 instead of a CLI redesign.
+
+The `driver` backend is diagnostic-only until the Driver API worker can run a real compute loop.
+It checks that `libcuda.so.1` can be loaded, `cuInit` succeeds, the driver version can be queried,
+and at least one CUDA device is visible.
 
 The current code boundary is:
 

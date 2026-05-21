@@ -45,6 +45,7 @@ Stop a foreground guard with `Ctrl+C`.
 ```bash
 gpu-holder doctor
 gpu-holder doctor --backend torch
+gpu-holder doctor --backend driver
 gpu-holder guard --gpus 0-7 --risk-util 0.6 --target-util 0.9 --mem 0.05 --backend torch
 gpu-holder start --gpus 0-7 --risk-util 0.6 --target-util 0.9 --mem 0.05 --backend torch
 gpu-holder status
@@ -126,6 +127,9 @@ python -m pip install -e ".[torch]"
 
 The current backend selector exposes `--backend torch`. The option is intentionally present before
 additional backends exist, so scripts can keep the same shape when the default backend changes.
+`gpu-holder doctor --backend driver` can already check whether `libcuda.so.1` and CUDA devices are
+visible through the NVIDIA Driver API. The driver backend is diagnostic-only for now and is not yet
+accepted by `guard` or `start`.
 
 Planned backend direction:
 

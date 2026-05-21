@@ -211,7 +211,7 @@ def test_worker_stop_kills_process_after_short_terminate_timeout() -> None:
 
 
 def test_worker_rejects_unknown_backend() -> None:
-    with pytest.raises(ValueError, match="unsupported backend"):
+    with pytest.raises(ValueError, match="unsupported worker backend"):
         WorkerProcess(
             gpu_index=0,
             memory_bytes=0,

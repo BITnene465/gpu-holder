@@ -13,7 +13,8 @@ import time
 
 from . import __version__
 from .backends import DEFAULT_BACKEND
-from .backends import SUPPORTED_BACKENDS
+from .backends import SUPPORTED_DIAGNOSTIC_BACKENDS
+from .backends import SUPPORTED_WORKER_BACKENDS
 from .backends import check_backend
 from .backends import normalize_backend
 from .models import Decision, GpuProcess, GpuSnapshot
@@ -118,7 +119,7 @@ def build_parser() -> argparse.ArgumentParser:
     dashboard.add_argument("--state-dir", default=str(STATE_DIR))
     doctor = sub.add_parser("doctor", help="check nvidia-smi and worker backend")
     doctor.add_argument("--json", action="store_true")
-    doctor.add_argument("--backend", default=DEFAULT_BACKEND, choices=SUPPORTED_BACKENDS)
+    doctor.add_argument("--backend", default=DEFAULT_BACKEND, choices=SUPPORTED_DIAGNOSTIC_BACKENDS)
     return parser
 
 
@@ -156,7 +157,7 @@ def add_run_args(parser: argparse.ArgumentParser, *, include_controls: bool = Fa
     parser.add_argument(
         "--backend",
         default=DEFAULT_BACKEND,
-        choices=SUPPORTED_BACKENDS,
+        choices=SUPPORTED_WORKER_BACKENDS,
         help="worker backend to use",
     )
     parser.add_argument("--program", default="matmul")

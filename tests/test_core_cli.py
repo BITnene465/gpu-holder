@@ -64,6 +64,12 @@ def test_guard_parser_exposes_worker_backend() -> None:
     assert config.backend == "torch"
 
 
+def test_doctor_parser_accepts_driver_diagnostic_backend() -> None:
+    args = build_parser().parse_args(["doctor", "--backend", "driver"])
+
+    assert args.backend == "driver"
+
+
 def test_status_payload_reports_selected_backend() -> None:
     config = Config(backend="torch")
     gpu = GpuSnapshot(
