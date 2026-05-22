@@ -70,6 +70,7 @@ class Config:
     log_interval: float = 10.0
     dry_run: bool = False
     once: bool = False
+    explain: bool = False
 
     @property
     def pid_file(self) -> Path:
@@ -174,6 +175,11 @@ def add_run_args(parser: argparse.ArgumentParser, *, include_controls: bool = Fa
     if include_controls:
         parser.add_argument("--dry-run", action="store_true", help="print one decision snapshot only")
         parser.add_argument("--once", action="store_true", help="run one guard iteration and exit")
+        parser.add_argument(
+            "--explain",
+            action="store_true",
+            help="include per-GPU decision explanations in foreground output",
+        )
 
 
 def cmd_guard(args: argparse.Namespace) -> int:
@@ -282,6 +288,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         check_nvidia_smi(),
         check_backend(args.backend).as_payload(),
     ]
+    checks = [check | {"hint": doctor_hint(check, args.backend)} for check in checks]
     payload = {"ok": all(item["ok"] for item in checks), "checks": checks}
     if args.json:
         print(json.dumps(payload, indent=2))
@@ -289,6 +296,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         for item in checks:
             status = "ok" if item["ok"] else "fail"
             print(f"{item['name']}: {status} {item['detail']}")
+            print(f"  hint: {item['hint']}")
     return 0 if payload["ok"] else 1
 
 
@@ -314,7 +322,12 @@ class Guard:
         log(self.config, f"started pid={os.getpid()} gpus={format_gpus(self.config.gpus)}")
         try:
             while not self.stop:
-                self.run_once(apply=True, write_status=True, log_status=True, print_status=False)
+                self.run_once(
+                    apply=True,
+                    write_status=True,
+                    log_status=True,
+                    print_status=self.config.once and self.config.explain,
+                )
                 if self.config.once:
                     break
                 time.sleep(max(0.2, self.config.sample_interval))
@@ -354,6 +367,8 @@ class Guard:
             self.log_summary(payload)
         if print_status:
             print(format_status(payload))
+            if self.config.explain:
+                print(format_explain(payload))
         return 0
 
     def apply(self, decisions: list[Decision]) -> None:
@@ -510,6 +525,50 @@ def format_status(payload: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
+def format_explain(payload: dict[str, object]) -> str:
+    config = payload.get("config") if isinstance(payload.get("config"), dict) else {}
+    lines = ["explain:"]
+    for gpu in payload.get("gpus", []):
+        if not isinstance(gpu, dict):
+            continue
+        decision = gpu.get("decision") if isinstance(gpu.get("decision"), dict) else {}
+        processes = gpu.get("processes") if isinstance(gpu.get("processes"), list) else []
+        external_count = sum(1 for process in processes if isinstance(process, dict) and not process.get("is_holder"))
+        holder_count = sum(1 for process in processes if isinstance(process, dict) and process.get("is_holder"))
+        lines.append(
+            f"- gpu={gpu.get('index')}: {decision_summary(decision)}; "
+            f"util={gpu.get('utilization')}%, risk={float(config.get('risk_util', 0)) * 100:.0f}%, "
+            f"target={float(config.get('target_util', 0)) * 100:.0f}%, "
+            f"external_processes={external_count}, holder_processes={holder_count}, "
+            f"memory_request={human_bytes(int(decision.get('memory_bytes') or 0))}"
+        )
+    return "\n".join(lines)
+
+
+def decision_summary(decision: dict[str, object]) -> str:
+    reason = str(decision.get("reason", "unknown"))
+    action = str(decision.get("action", "unknown"))
+    if action == "hold":
+        if reason == "below_risk":
+            return "start/keep holder because utilization is below the risk threshold"
+        if reason == "holder_running":
+            return "keep existing holder because no external CUDA process is competing"
+        if reason == "busy_process_idle":
+            return "start assist holder because a large external process is past grace and still idle"
+        if reason == "external_process_idle":
+            return "start assist holder because only stale external process records remain and utilization is low"
+        return f"hold because {reason}"
+    if reason == "busy_process_grace":
+        return "release holder because a large external CUDA process is still in its grace window"
+    if reason == "busy_process":
+        return "release holder because a large external CUDA process is active"
+    if reason == "external_process":
+        return "release holder because an external CUDA process is present"
+    if reason == "risk_clear":
+        return "release holder because utilization is above the risk threshold"
+    return f"{action} because {reason}"
+
+
 def compact_status(payload: dict[str, object]) -> str:
     machine = payload.get("machine") if isinstance(payload.get("machine"), dict) else {}
     return (
@@ -517,6 +576,37 @@ def compact_status(payload: dict[str, object]) -> str:
         f"workers={machine.get('worker_count')} "
         f"age={time.time() - float(payload.get('timestamp', time.time())):.0f}s"
     )
+
+
+def doctor_hint(check: dict[str, object], backend: str) -> str:
+    name = str(check.get("name", ""))
+    ok = bool(check.get("ok"))
+    detail = str(check.get("detail", ""))
+    if name == "python":
+        return "Python 3.10 is expected by this package." if not ok else "Python runtime is supported."
+    if name == "nvidia-smi":
+        if ok:
+            return "GPU telemetry is available."
+        return "Install or expose NVIDIA driver tools so `nvidia-smi` is available in this environment."
+    if name == "torch_cuda":
+        if ok:
+            return "`--backend torch` can start CUDA workers on this machine."
+        if "ImportError" in detail or "ModuleNotFoundError" in detail:
+            return "Install a CUDA-enabled PyTorch build, or use `--backend driver` to avoid PyTorch."
+        return "PyTorch is installed but CUDA is unavailable; check the PyTorch CUDA build, driver, and device visibility."
+    if name == "driver_cuda":
+        if ok:
+            return "`--backend driver` can run without PyTorch on this machine."
+        if "load_failed" in detail:
+            return "Expose `libcuda.so.1` from the NVIDIA driver, or use `--backend torch` if PyTorch CUDA works."
+        if "device_count=0" in detail:
+            return "Expose CUDA devices to this host/container; check `/dev/nvidia*` and CUDA_VISIBLE_DEVICES."
+        if "ptx_smoke=" in detail:
+            return "The driver loaded but embedded PTX did not launch; check driver age and try `--backend torch`."
+        if "cuInit_failed" in detail:
+            return "The NVIDIA driver rejected initialization; check driver health, permissions, and container GPU access."
+        return "Driver backend is unavailable; run this on Linux with NVIDIA driver and accessible CUDA devices."
+    return f"Backend requested: {backend}."
 
 
 def write_json(path: Path, payload: dict[str, object]) -> None:
@@ -590,6 +680,7 @@ def config_from_args(args: argparse.Namespace) -> Config:
         log_interval=args.log_interval,
         dry_run=getattr(args, "dry_run", False),
         once=getattr(args, "once", False),
+        explain=getattr(args, "explain", False),
     )
 
 

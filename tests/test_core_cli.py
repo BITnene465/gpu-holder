@@ -8,8 +8,11 @@ from gpu_holder.cli import (
     ProcessKillTarget,
     build_parser,
     child_args,
+    cmd_doctor,
     config_from_args,
     decide,
+    doctor_hint,
+    format_explain,
     format_gpus,
     make_hold,
     make_release,
@@ -19,6 +22,7 @@ from gpu_holder.cli import (
     process_signature,
     status_payload,
 )
+from gpu_holder.backends import BackendCheck
 
 
 def test_ratio_options_accept_new_float_and_legacy_percent() -> None:
@@ -55,6 +59,15 @@ def test_guard_parser_defaults_use_short_target_duty_cycle() -> None:
     assert config.max_duty_cycle == 1.0
     assert config.compute_burst_seconds == 0.2
     assert config.process_grace_window == 120.0
+    assert config.explain is False
+
+
+def test_guard_parser_exposes_explain_mode() -> None:
+    args = build_parser().parse_args(["guard", "--dry-run", "--explain"])
+    config = config_from_args(args)
+
+    assert config.dry_run is True
+    assert config.explain is True
 
 
 def test_guard_parser_exposes_worker_backend() -> None:
@@ -93,6 +106,69 @@ def test_status_payload_reports_selected_backend() -> None:
     payload = status_payload([gpu], [decision], {}, config)
 
     assert payload["config"]["backend"] == "torch"
+
+
+def test_format_explain_adds_thresholds_and_human_reason() -> None:
+    config = Config(backend="driver", risk_util=0.5, target_util=0.75)
+    gpu = GpuSnapshot(
+        index=0,
+        uuid="gpu-0",
+        name="GPU 0",
+        utilization=10,
+        memory_total=80 * 1024**3,
+        memory_used=1 * 1024**3,
+        memory_free=79 * 1024**3,
+        temperature=None,
+        processes=[],
+    )
+    decision = make_hold(gpu, config, reason="below_risk", assist=False)
+    payload = status_payload([gpu], [decision], {}, config)
+
+    output = format_explain(payload)
+
+    assert "explain:" in output
+    assert "gpu=0" in output
+    assert "below the risk threshold" in output
+    assert "risk=50%" in output
+    assert "target=75%" in output
+    assert "memory_request=" in output
+
+
+def test_doctor_hint_guides_backend_choice() -> None:
+    assert "use `--backend driver`" in doctor_hint(
+        {"name": "torch_cuda", "ok": False, "detail": "ModuleNotFoundError: torch"},
+        "torch",
+    )
+    assert "without PyTorch" in doctor_hint(
+        {"name": "driver_cuda", "ok": True, "detail": "library=libcuda.so.1"},
+        "driver",
+    )
+    assert "Expose `libcuda.so.1`" in doctor_hint(
+        {"name": "driver_cuda", "ok": False, "detail": "load_failed not found"},
+        "driver",
+    )
+
+
+def test_doctor_json_includes_hints(monkeypatch, capsys) -> None:
+    args = build_parser().parse_args(["doctor", "--backend", "driver", "--json"])
+    monkeypatch.setattr(
+        "gpu_holder.cli.check_nvidia_smi",
+        lambda: {"name": "nvidia-smi", "ok": True, "detail": "gpu_count=1"},
+    )
+    monkeypatch.setattr(
+        "gpu_holder.cli.check_backend",
+        lambda backend: BackendCheck(
+            name="driver_cuda",
+            ok=True,
+            detail=f"backend={backend} library=libcuda.so.1",
+        ),
+    )
+
+    assert cmd_doctor(args) == 0
+
+    output = capsys.readouterr().out
+    assert '"hint": "GPU telemetry is available."' in output
+    assert '"hint": "`--backend driver` can run without PyTorch on this machine."' in output
 
 
 def test_gpu_option_accepts_ranges_and_mixed_lists() -> None:
@@ -516,6 +592,35 @@ def test_guard_dry_run_prints_decisions_without_state_or_workers(monkeypatch, tm
     assert "action=hold reason=below_risk" in output
     assert not config.pid_file.exists()
     assert not config.status_file.exists()
+
+
+def test_guard_dry_run_explain_prints_decision_explanation(monkeypatch, tmp_path, capsys) -> None:
+    def fake_read_snapshots(workers: dict[int, object]) -> list[GpuSnapshot]:
+        del workers
+        return [
+            GpuSnapshot(
+                index=0,
+                uuid="gpu-0",
+                name="GPU 0",
+                utilization=10,
+                memory_total=80 * 1024**3,
+                memory_used=1 * 1024**3,
+                memory_free=79 * 1024**3,
+                temperature=None,
+                processes=[],
+            )
+        ]
+
+    config = Config(state_dir=tmp_path, dry_run=True, explain=True, risk_util=0.5)
+    guard = Guard(config)
+    monkeypatch.setattr("gpu_holder.cli.read_snapshots", fake_read_snapshots)
+
+    assert guard.run() == 0
+
+    output = capsys.readouterr().out
+    assert "action=hold reason=below_risk" in output
+    assert "explain:" in output
+    assert "below the risk threshold" in output
 
 
 def test_guard_once_runs_one_iteration_and_cleans_pidfile(monkeypatch, tmp_path) -> None:

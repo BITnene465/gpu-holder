@@ -111,6 +111,10 @@ def test_repository_has_github_ready_safety_docs() -> None:
     assert "## 中文" not in readme
     assert "### Quick Start" in readme_en
     assert "### 快速开始" in readme
+    assert "## 一分钟选择" in readme
+    assert "## One-Minute Choice" in readme_en
+    assert "--dry-run --explain" in readme
+    assert "--dry-run --explain" in readme_en
     assert "外部 CUDA 进程只是只读调度信号。" in contributing
     assert "policy.py" in contributing
     assert "driver_backend.py" in contributing

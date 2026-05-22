@@ -6,6 +6,20 @@
 
 [中文](README.md)
 
+## One-Minute Choice
+
+```bash
+gpu-holder doctor --backend driver
+gpu-holder guard --gpus 0-7 --dry-run --backend driver --explain
+```
+
+- Unsure about the machine: start with `gpu-holder doctor --backend driver`.
+- Do not want PyTorch: try `--backend driver` first, then follow doctor hints if driver/device
+  access fails.
+- Already have CUDA-enabled PyTorch: the default `--backend torch` is fine.
+- First run on a shared machine: use `--dry-run --explain` to inspect every per-GPU decision.
+- Ready to hold in foreground: remove `--dry-run`; for background mode use `gpu-holder start ...`.
+
 `gpu-holder` is a small NVIDIA GPU guard for shared training machines. It starts lightweight CUDA
 holder workers when selected GPUs fall below a per-GPU utilization floor, and it yields to real
 training or inference jobs without killing, suspending, renicing, or modifying external processes.
