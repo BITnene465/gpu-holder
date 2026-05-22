@@ -92,6 +92,7 @@ def test_repository_has_github_ready_safety_docs() -> None:
     roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     readme_en = (ROOT / "README.en.md").read_text(encoding="utf-8")
+    hero = (ROOT / "assets" / "hero.svg").read_text(encoding="utf-8")
     development_log = (ROOT / "docs" / "development_log.md").read_text(encoding="utf-8")
 
     assert (ROOT / "README.en.md").exists()
@@ -106,6 +107,8 @@ def test_repository_has_github_ready_safety_docs() -> None:
     assert (ROOT / ".github" / "pull_request_template.md").exists()
     assert '<img src="assets/hero.svg"' in readme
     assert '<img src="assets/hero.svg"' in readme_en
+    assert 'width="190"' in hero
+    assert "PyTorch fallback" in hero
     assert '<a href="README.en.md">English</a>' in readme
     assert '<a href="README.md">中文</a>' in readme_en
     assert "## English" not in readme
