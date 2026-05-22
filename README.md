@@ -1,12 +1,34 @@
-# gpu-holder
+<p align="center">
+  <img src="assets/hero.svg" alt="gpu-holder: GPU guard for shared NVIDIA training machines">
+</p>
 
-[![CI](https://github.com/BITnene465/gpu-holder/actions/workflows/ci.yml/badge.svg)](https://github.com/BITnene465/gpu-holder/actions/workflows/ci.yml)
+<p align="center">
+  <a href="README.en.md">English</a> ·
+  <a href="docs/backend_strategy.md">后端策略</a> ·
+  <a href="ROADMAP.md">路线图</a> ·
+  <a href="docs/development_log.md">开发日志</a>
+</p>
 
-<p align="center"><img src="assets/logo.png" alt="gpu-holder logo" width="160"></p>
+<p align="center">
+  <a href="https://github.com/BITnene465/gpu-holder/actions/workflows/ci.yml"><img src="https://github.com/BITnene465/gpu-holder/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/python-3.10-3776ab" alt="Python 3.10">
+  <img src="https://img.shields.io/badge/backend-driver%20%7C%20torch-76b900" alt="driver and torch backends">
+  <img src="https://img.shields.io/badge/safety-read--only%20external%20jobs-0f1419" alt="read-only external jobs">
+</p>
 
-[English](README.en.md)
+<p align="center">
+  <strong>共享 NVIDIA 训练机器上的轻量 GPU guard。</strong><br>
+  保持空闲 GPU 活跃，同时对真实训练/推理任务主动让路。
+</p>
 
 ## 一分钟选择
+
+| 场景 | 先运行 |
+| --- | --- |
+| 不确定机器能不能跑 | `gpu-holder doctor --backend driver` |
+| 首次在共享机器试用 | `gpu-holder guard --gpus 0-7 --dry-run --backend driver --explain` |
+| 已有 CUDA 版 PyTorch | `gpu-holder guard --gpus 0-7 --backend torch` |
+| 不想安装 PyTorch | `gpu-holder guard --gpus 0-7 --backend driver` |
 
 ```bash
 gpu-holder doctor --backend driver

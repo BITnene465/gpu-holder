@@ -1,0 +1,30 @@
+<svg width="1200" height="360" viewBox="0 0 1200 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="360" rx="28" fill="#0f1419"/>
+  <path d="M0 280C146 229 236 226 365 265C503 307 594 303 723 250C880 185 1005 184 1200 246V360H0V280Z" fill="#172028"/>
+  <path d="M0 288C142 239 242 236 369 273C504 312 594 309 723 258C883 195 1008 196 1200 256" stroke="#76b900" stroke-width="4" opacity="0.75"/>
+  <g transform="translate(90 55)">
+    <path d="M120 0L220 38V125C220 190 179 228 120 250C61 228 20 190 20 125V38L120 0Z" fill="#101820" stroke="#76b900" stroke-width="12" stroke-linejoin="round"/>
+    <path d="M120 0L220 38V125C220 190 179 228 120 250V0Z" fill="#1b242c"/>
+    <rect x="67" y="91" width="112" height="68" rx="8" fill="#e8f0f2"/>
+    <rect x="81" y="105" width="84" height="40" rx="4" fill="#111820"/>
+    <path d="M52 111H78" stroke="#e8f0f2" stroke-width="12" stroke-linecap="round"/>
+    <path d="M52 139H78" stroke="#e8f0f2" stroke-width="12" stroke-linecap="round"/>
+    <path d="M101 77V94M121 77V94M141 77V94M101 158V175M121 158V175M141 158V175" stroke="#e8f0f2" stroke-width="8" stroke-linecap="round"/>
+    <path d="M68 126H94L105 103L121 153L134 112L146 126H180" stroke="#76b900" stroke-width="8" stroke-linejoin="round"/>
+  </g>
+  <g transform="translate(390 88)">
+    <text x="0" y="58" fill="#f7fafc" font-size="66" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-weight="760">gpu-holder</text>
+    <text x="2" y="104" fill="#b7c3cc" font-size="25" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">GPU guard for shared NVIDIA training machines</text>
+    <g transform="translate(0 145)">
+      <rect x="0" y="0" width="178" height="38" rx="19" fill="#1c2730" stroke="#2f3c46"/>
+      <circle cx="24" cy="19" r="6" fill="#76b900"/>
+      <text x="42" y="25" fill="#e8f0f2" font-size="15" font-family="Inter, ui-sans-serif, system-ui">read-only signals</text>
+      <rect x="196" y="0" width="156" height="38" rx="19" fill="#1c2730" stroke="#2f3c46"/>
+      <circle cx="220" cy="19" r="6" fill="#76b900"/>
+      <text x="238" y="25" fill="#e8f0f2" font-size="15" font-family="Inter, ui-sans-serif, system-ui">driver backend</text>
+      <rect x="370" y="0" width="143" height="38" rx="19" fill="#1c2730" stroke="#2f3c46"/>
+      <circle cx="394" cy="19" r="6" fill="#76b900"/>
+      <text x="412" y="25" fill="#e8f0f2" font-size="15" font-family="Inter, ui-sans-serif, system-ui">PyTorch fallback</text>
+    </g>
+  </g>
+</svg>

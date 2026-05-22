@@ -96,6 +96,7 @@ def test_repository_has_github_ready_safety_docs() -> None:
 
     assert (ROOT / "README.en.md").exists()
     assert (ROOT / "assets" / "logo.png").exists()
+    assert (ROOT / "assets" / "hero.svg").exists()
     assert (ROOT / "CONTRIBUTING.md").exists()
     assert (ROOT / "MANIFEST.in").exists()
     assert (ROOT / "ROADMAP.md").exists()
@@ -103,10 +104,12 @@ def test_repository_has_github_ready_safety_docs() -> None:
     assert (ROOT / "docs" / "development_log.md").exists()
     assert (ROOT / ".github" / "workflows" / "ci.yml").exists()
     assert (ROOT / ".github" / "pull_request_template.md").exists()
-    assert "[English](README.en.md)" in readme
-    assert "[中文](README.md)" in readme_en
-    assert "assets/logo.png" in readme
-    assert "assets/logo.png" in readme_en
+    assert '<img src="assets/hero.svg"' in readme
+    assert '<img src="assets/hero.svg"' in readme_en
+    assert '<a href="README.en.md">English</a>' in readme
+    assert '<a href="README.md">中文</a>' in readme_en
+    assert "assets/logo.png" not in readme
+    assert "assets/logo.png" not in readme_en
     assert "## English" not in readme
     assert "## 中文" not in readme
     assert "### Quick Start" in readme_en
@@ -124,7 +127,7 @@ def test_repository_has_github_ready_safety_docs() -> None:
     assert "worker_controls.py # backend-neutral duty cycle, jitter, and hold-mode controls" in readme_en
     assert "gpu-holder guard --gpus 0 --risk-util 0.6 --target-util 0.9 --mem 0 --backend driver --once" in contributing
     assert "include README.en.md" in manifest
-    assert "recursive-include assets *.png" in manifest
+    assert "recursive-include assets *.png *.svg" in manifest
     assert "ROADMAP.md" in readme
     assert "docs/development_log.md" in readme
     assert "avoid PyTorch and use the experimental Driver API backend" in readme_en
