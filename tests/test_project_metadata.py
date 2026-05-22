@@ -106,10 +106,10 @@ def test_repository_has_github_ready_safety_docs() -> None:
     assert (ROOT / ".github" / "pull_request_template.md").exists()
     assert '<img src="assets/hero.svg"' in readme
     assert '<img src="assets/hero.svg"' in readme_en
+    assert '<img src="assets/logo.png"' in readme
+    assert '<img src="assets/logo.png"' in readme_en
     assert '<a href="README.en.md">English</a>' in readme
     assert '<a href="README.md">中文</a>' in readme_en
-    assert "assets/logo.png" not in readme
-    assert "assets/logo.png" not in readme_en
     assert "## English" not in readme
     assert "## 中文" not in readme
     assert "### Quick Start" in readme_en

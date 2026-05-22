@@ -1,4 +1,8 @@
 <p align="center">
+  <img src="assets/logo.png" alt="gpu-holder logo" width="128">
+</p>
+
+<p align="center">
   <img src="assets/hero.svg" alt="gpu-holder: GPU guard for shared NVIDIA training machines">
 </p>
 
